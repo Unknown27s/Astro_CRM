@@ -1,6 +1,40 @@
 # Quick Start Guide - CRM Pro
 
+For one-place install commands, see: `INSTALL_REQUIREMENTS.md`
+
 ## Installation & Setup
+
+### Requirements Pack (Install First)
+
+- **Node.js**: v18 or newer
+- **npm**: comes with Node.js
+
+This project has two dependency packs:
+
+1. **Backend pack** (`backend/package.json`) — API, database, import/export, auth
+2. **Frontend pack** (`frontend/package.json`) — React UI, charts, tables, routing
+
+Backend runtime packages:
+- `express`, `cors`, `sql.js`, `multer`, `csv-parser`, `exceljs`, `jsonwebtoken`, `pdfkit`, `dotenv`
+
+Frontend runtime packages:
+- `react`, `react-dom`, `react-router-dom`, `axios`, `@tanstack/react-table`, `recharts`, `papaparse`, `lucide-react`
+
+Install both packs:
+
+```bash
+cd backend
+npm install
+
+cd ../frontend
+npm install
+```
+
+Windows PowerShell one-liner:
+
+```powershell
+cd backend; npm install; cd ..\frontend; npm install
+```
 
 ### 1. Backend Setup
 

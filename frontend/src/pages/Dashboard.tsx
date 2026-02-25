@@ -1,13 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { analytics } from '../services/api';
+import { useEffect, useState } from 'react';
+import { customers, purchases, insights } from '../services/api';
 import {
     LineChart,
     Line,
-    BarChart,
-    Bar,
-    PieChart,
-    Pie,
-    Cell,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -15,11 +10,12 @@ import {
     Legend,
     ResponsiveContainer,
 } from 'recharts';
-import { Users, DollarSign, TrendingUp, Activity } from 'lucide-react';
+import { Users, DollarSign, TrendingUp, ShoppingBag } from 'lucide-react';
 
 export default function Dashboard() {
-    const [dashboardData, setDashboardData] = useState<any>(null);
-    const [salesTrends, setSalesTrends] = useState<any[]>([]);
+    const [stats, setStats] = useState<any>(null);
+    const [revenueTrends, setRevenueTrends] = useState <any[]>([]);
+    const [recentPurchases, setRecentPurchases] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -28,12 +24,14 @@ export default function Dashboard() {
 
     const loadDashboard = async () => {
         try {
-            const [dashRes, trendsRes] = await Promise.all([
-                analytics.getDashboard(),
-                analytics.getSalesTrends({ period: 'month', limit: 12 }),
+            const [customerRes, revRes, recentRes] = await Promise.all([
+                customers.getStats(),
+                insights.getRevenueTrends('30days'),
+                purchases.getRecent(5),
             ]);
-            setDashboardData(dashRes.data);
-            setSalesTrends(trendsRes.data.trends);
+            setStats(customerRes.data);
+            setRevenueTrends(revRes.data.trends || []);
+            setRecentPurchases(recentRes.data.purchases || []);
         } catch (error) {
             console.error('Error loading dashboard:', error);
         } finally {
@@ -49,29 +47,29 @@ export default function Dashboard() {
         );
     }
 
-    const stats = [
+    const kpiCards = [
         {
-            label: 'Total Contacts',
-            value: dashboardData?.contacts?.count || 0,
+            label: 'Total Customers',
+            value: stats?.total_customers || 0,
             icon: Users,
             color: 'bg-blue-500',
         },
         {
-            label: 'Total Deals',
-            value: dashboardData?.deals?.total_deals || 0,
+            label: 'Active Customers',
+            value: stats?.active_customers || 0,
             icon: TrendingUp,
             color: 'bg-green-500',
         },
         {
             label: 'Total Revenue',
-            value: `$${(dashboardData?.sales?.total_revenue || 0).toLocaleString()}`,
+            value: `₹${(stats?.total_revenue || 0).toLocaleString()}`,
             icon: DollarSign,
             color: 'bg-purple-500',
         },
         {
-            label: 'Total Sales',
-            value: dashboardData?.sales?.total_sales || 0,
-            icon: Activity,
+            label: 'VIP Customers',
+            value: stats?.vip_customers || 0,
+            icon: ShoppingBag,
             color: 'bg-orange-500',
         },
     ];
@@ -80,12 +78,12 @@ export default function Dashboard() {
         <div className="space-y-6">
             <div>
                 <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-                <p className="text-gray-600 mt-1">Welcome to your CRM overview</p>
+                <p className="text-gray-600 mt-1">Welcome to your retail CRM overview</p>
             </div>
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {stats.map((stat, index) => {
+                {kpiCards.map((stat, index) => {
                     const Icon = stat.icon;
                     return (
                         <div
@@ -110,58 +108,60 @@ export default function Dashboard() {
 
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Sales Trends */}
+                {/* Revenue Trends */}
                 <div className="bg-white rounded-xl shadow-md p-6">
                     <h2 className="text-xl font-bold text-gray-800 mb-4">
-                        Sales Trends (Last 12 Months)
+                        Revenue Trends (Last 30 Days)
                     </h2>
                     <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={salesTrends}>
+                        <LineChart data={revenueTrends}>
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="period" />
+                            <XAxis dataKey="date" />
                             <YAxis />
                             <Tooltip />
                             <Legend />
                             <Line
                                 type="monotone"
                                 dataKey="revenue"
-                                stroke="#8b5cf6"
-                                strokeWidth={2}
+                                stroke="#10B981"
+                                strokeWidth={3}
                                 name="Revenue"
                             />
                             <Line
                                 type="monotone"
-                                dataKey="count"
-                                stroke="#3b82f6"
+                                dataKey="purchase_count"
+                                stroke="#4F46E5"
                                 strokeWidth={2}
-                                name="Sales Count"
+                                name="Purchases"
                             />
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
 
-                {/* Recent Activities */}
+                {/* Recent Purchases */}
                 <div className="bg-white rounded-xl shadow-md p-6">
                     <h2 className="text-xl font-bold text-gray-800 mb-4">
-                        Recent Activities
+                        Recent Purchases
                     </h2>
                     <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                        {dashboardData?.recentActivities?.slice(0, 5).map((activity: any) => (
+                        {recentPurchases.map((purchase: any) => (
                             <div
-                                key={activity.id}
-                                className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg"
+                                key={purchase.id}
+                                className="flex items-start justify-between p-3 bg-gray-50 rounded-lg"
                             >
-                                <div className="bg-indigo-100 p-2 rounded-lg">
-                                    <Activity size={16} className="text-indigo-600" />
-                                </div>
                                 <div className="flex-1">
-                                    <p className="font-medium text-gray-800">{activity.subject}</p>
-                                    <p className="text-sm text-gray-600">
-                                        {activity.first_name} {activity.last_name} • {activity.type}
-                                    </p>
+                                    <p className="font-medium text-gray-800">{purchase.customer_name}</p>
+                                    <p className="text-sm text-gray-600">{purchase.purchase_date}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="font-bold text-green-600">₹{purchase.total_amount.toFixed(2)}</p>
+                                    <p className="text-xs text-gray-500">{purchase.payment_method || 'Cash'}</p>
                                 </div>
                             </div>
                         ))}
+                        {recentPurchases.length === 0 && (
+                            <p className="text-center text-gray-500 py-8">No recent purchases</p>
+                        )}
                     </div>
                 </div>
             </div>

@@ -4,7 +4,6 @@ import { Upload, FileSpreadsheet, CheckCircle, AlertCircle } from 'lucide-react'
 
 export default function Import() {
     const [file, setFile] = useState<File | null>(null);
-    const [importType, setImportType] = useState('contacts');
     const [preview, setPreview] = useState<any>(null);
     const [fieldMapping, setFieldMapping] = useState<Record<string, string>>({});
     const [importing, setImporting] = useState(false);
@@ -21,7 +20,7 @@ export default function Import() {
         // Upload and preview
         const formData = new FormData();
         formData.append('file', selectedFile);
-        formData.append('importType', importType);
+        formData.append('importType', 'customers');
 
         try {
             const response = await importData.upload(formData);
@@ -39,7 +38,7 @@ export default function Import() {
         setImporting(true);
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('importType', importType);
+        formData.append('importType', 'customers');
         formData.append('fieldMapping', JSON.stringify(fieldMapping));
 
         try {
@@ -56,34 +55,15 @@ export default function Import() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold text-gray-800">Import Data</h1>
+                <h1 className="text-3xl font-bold text-gray-800">Import Customers</h1>
                 <p className="text-gray-600 mt-1">
-                    Upload CSV or Excel files to import contacts and sales data
+                    Upload CSV or Excel files to import customer data
                 </p>
             </div>
 
             {/* Upload Section */}
             <div className="bg-white rounded-xl shadow-md p-6">
                 <div className="space-y-4">
-                    {/* Import Type */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Import Type
-                        </label>
-                        <select
-                            value={importType}
-                            onChange={(e) => {
-                                setImportType(e.target.value);
-                                setFile(null);
-                                setPreview(null);
-                            }}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        >
-                            <option value="contacts">Contacts</option>
-                            <option value="sales">Sales Data</option>
-                        </select>
-                    </div>
-
                     {/* File Upload */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -92,7 +72,7 @@ export default function Import() {
                         <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-500 transition-colors">
                             <input
                                 type="file"
-                                accept=".csv,.xlsx,.xls"
+                                accept=".csv,.xlsx"
                                 onChange={handleFileChange}
                                 className="hidden"
                                 id="file-upload"
@@ -102,7 +82,7 @@ export default function Import() {
                                 <p className="text-gray-600 mb-1">
                                     {file ? file.name : 'Click to upload or drag and drop'}
                                 </p>
-                                <p className="text-sm text-gray-500">CSV or Excel files only</p>
+                                <p className="text-sm text-gray-500">CSV or XLSX files only</p>
                             </label>
                         </div>
                     </div>
@@ -202,6 +182,11 @@ export default function Import() {
                             <p className="text-gray-600">
                                 Successfully imported {result.imported} of {result.total} records
                             </p>
+                            {result.skipped > 0 && (
+                                <p className="text-sm text-blue-600 mt-1">
+                                    Skipped {result.skipped} duplicate(s) (phone or email already exists)
+                                </p>
+                            )}
                         </div>
                     </div>
 

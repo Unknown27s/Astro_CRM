@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { deals } from '../services/api';
 import { Plus } from 'lucide-react';
 
@@ -14,7 +14,6 @@ const stages = [
 export default function Sales() {
     const [dealList, setDealList] = useState<any[]>([]);
     const [pipelineStats, setPipelineStats] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         loadDeals();
@@ -27,8 +26,6 @@ export default function Sales() {
             setDealList(response.data.deals);
         } catch (error) {
             console.error('Error loading deals:', error);
-        } finally {
-            setLoading(false);
         }
     };
 

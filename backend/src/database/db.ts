@@ -52,9 +52,9 @@ export function query<T = any>(sql: string, params: any[] = []): T[] {
     const columns = results[0].columns;
     const values = results[0].values;
 
-    return values.map(row => {
+    return values.map((row: any[]) => {
         const obj: any = {};
-        columns.forEach((col, idx) => {
+        columns.forEach((col: string, idx: number) => {
             obj[col] = row[idx];
         });
         return obj as T;
@@ -96,4 +96,3 @@ export function transaction<T>(callback: () => T): T {
     }
 }
 
-export default db;

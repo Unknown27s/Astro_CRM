@@ -3,7 +3,25 @@
 export function mapFieldsToSchema(fields: string[], importType: string): Record<string, string> {
     const mapping: Record<string, string> = {};
 
-    if (importType === 'contacts') {
+    if (importType === 'customers') {
+        const customerFieldMap: Record<string, string[]> = {
+            name: ['name', 'customer_name', 'full_name', 'fullname', 'customer'],
+            phone: ['phone', 'telephone', 'mobile', 'phone_number', 'tel', 'contact'],
+            email: ['email', 'email_address', 'e-mail', 'mail'],
+            location: ['location', 'address', 'city', 'area', 'place', 'region'],
+            notes: ['notes', 'note', 'comments', 'comment', 'remarks', 'description']
+        };
+
+        Object.keys(customerFieldMap).forEach(schemaField => {
+            const possibleMatches = customerFieldMap[schemaField];
+            const match = fields.find(field =>
+                possibleMatches.some(pm => field.toLowerCase().includes(pm))
+            );
+            if (match) {
+                mapping[schemaField] = match;
+            }
+        });
+    } else if (importType === 'contacts') {
         const contactFieldMap: Record<string, string[]> = {
             first_name: ['first_name', 'firstname', 'first', 'fname', 'given_name'],
             last_name: ['last_name', 'lastname', 'last', 'lname', 'surname', 'family_name'],

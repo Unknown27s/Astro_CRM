@@ -1,9 +1,34 @@
 import { Router, Request, Response } from 'express';
 import PDFDocument from 'pdfkit';
-import XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { query } from '../database/db';
 
 const router = Router();
+
+async function sendExcelFile(
+    res: Response,
+    sheets: Array<{ name: string; rows: Record<string, any>[] }>,
+    fileName: string
+) {
+    const workbook = new ExcelJS.Workbook();
+
+    sheets.forEach(({ name, rows }) => {
+        const sheet = workbook.addWorksheet(name);
+        if (rows.length === 0) {
+            return;
+        }
+
+        const headers = Object.keys(rows[0]);
+        sheet.columns = headers.map((header) => ({ header, key: header, width: 20 }));
+        sheet.addRows(rows);
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+    res.send(Buffer.from(buffer));
+}
 
 // Generate sales report
 router.post('/sales', async (req: Request, res: Response) => {
@@ -96,39 +121,41 @@ router.post('/sales', async (req: Request, res: Response) => {
                 doc.moveDown(0.5);
             });
 
+            // Properly end the PDF stream
+            doc.on('error', (err: Error) => {
+                console.error('PDF generation error:', err);
+                if (!res.headersSent) {
+                    res.status(500).json({ error: 'PDF generation failed' });
+                }
+            });
+            
             doc.end();
         } else if (format === 'excel') {
-            // Generate Excel report
-            const worksheet = XLSX.utils.json_to_sheet(
-                salesData.map((s: any) => ({
-                    Date: s.sale_date,
-                    Customer: s.company || `${s.first_name} ${s.last_name}`,
-                    Product: s.product_name,
-                    Quantity: s.quantity,
-                    'Unit Price': s.unit_price,
-                    'Total Amount': s.total_amount,
-                    Region: s.region,
-                    Category: s.category
-                }))
-            );
+            const salesRows = salesData.map((s: any) => ({
+                Date: s.sale_date,
+                Customer: s.company || `${s.first_name} ${s.last_name}`,
+                Product: s.product_name,
+                Quantity: s.quantity,
+                'Unit Price': s.unit_price,
+                'Total Amount': s.total_amount,
+                Region: s.region,
+                Category: s.category
+            }));
 
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, 'Sales');
-
-            // Add summary sheet
             const summaryData = [
                 { Metric: 'Total Sales', Value: salesData.length },
                 { Metric: 'Total Revenue', Value: totalRevenue.toFixed(2) },
                 { Metric: 'Average Sale', Value: avgSale.toFixed(2) }
             ];
-            const summarySheet = XLSX.utils.json_to_sheet(summaryData);
-            XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
 
-            const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-
-            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            res.setHeader('Content-Disposition', 'attachment; filename=sales-report.xlsx');
-            res.send(buffer);
+            await sendExcelFile(
+                res,
+                [
+                    { name: 'Sales', rows: salesRows },
+                    { name: 'Summary', rows: summaryData }
+                ],
+                'sales-report.xlsx'
+            );
         } else {
             // Return JSON
             res.json({
@@ -177,28 +204,19 @@ router.post('/customers', async (req: Request, res: Response) => {
         const customerData = query(sql, params);
 
         if (format === 'excel') {
-            const worksheet = XLSX.utils.json_to_sheet(
-                customerData.map((c: any) => ({
-                    'First Name': c.first_name,
-                    'Last Name': c.last_name,
-                    Email: c.email,
-                    Phone: c.phone,
-                    Company: c.company,
-                    Position: c.position,
-                    Segment: c.segment_name || 'N/A',
-                    'Total Sales': c.total_sales,
-                    'Total Revenue': c.total_revenue
-                }))
-            );
+            const customerRows = customerData.map((c: any) => ({
+                'First Name': c.first_name,
+                'Last Name': c.last_name,
+                Email: c.email,
+                Phone: c.phone,
+                Company: c.company,
+                Position: c.position,
+                Segment: c.segment_name || 'N/A',
+                'Total Sales': c.total_sales,
+                'Total Revenue': c.total_revenue
+            }));
 
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, 'Customers');
-
-            const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-
-            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            res.setHeader('Content-Disposition', 'attachment; filename=customer-report.xlsx');
-            res.send(buffer);
+            await sendExcelFile(res, [{ name: 'Customers', rows: customerRows }], 'customer-report.xlsx');
         } else {
             res.json({ data: customerData });
         }
@@ -226,25 +244,16 @@ router.post('/segments', async (req: Request, res: Response) => {
     `);
 
         if (format === 'excel') {
-            const worksheet = XLSX.utils.json_to_sheet(
-                segmentData.map((s: any) => ({
-                    'Segment ID': s.segment_id,
-                    'Segment Name': s.segment_name,
-                    'Customer Count': s.customer_count,
-                    'Avg Customer Value': parseFloat(s.avg_customer_value || 0).toFixed(2),
-                    'Avg Purchase Frequency': parseFloat(s.avg_purchase_frequency || 0).toFixed(2),
-                    'Avg Days Since Purchase': parseFloat(s.avg_recency || 0).toFixed(0)
-                }))
-            );
+            const segmentRows = segmentData.map((s: any) => ({
+                'Segment ID': s.segment_id,
+                'Segment Name': s.segment_name,
+                'Customer Count': s.customer_count,
+                'Avg Customer Value': parseFloat(s.avg_customer_value || 0).toFixed(2),
+                'Avg Purchase Frequency': parseFloat(s.avg_purchase_frequency || 0).toFixed(2),
+                'Avg Days Since Purchase': parseFloat(s.avg_recency || 0).toFixed(0)
+            }));
 
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, 'Segments');
-
-            const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-
-            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            res.setHeader('Content-Disposition', 'attachment; filename=segment-analysis.xlsx');
-            res.send(buffer);
+            await sendExcelFile(res, [{ name: 'Segments', rows: segmentRows }], 'segment-analysis.xlsx');
         } else {
             res.json({ data: segmentData });
         }

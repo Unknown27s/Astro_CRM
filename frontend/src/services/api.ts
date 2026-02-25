@@ -26,7 +26,46 @@ export const auth = {
         api.post('/auth/register', { email, password, fullName }),
 };
 
-// Contacts
+// Customers (v3.0.0)
+export const customers = {
+    getAll: (params?: any) => api.get('/customers', { params }),
+    getOne: (id: number) => api.get(`/customers/${id}`),
+    create: (data: any) => api.post('/customers', data),
+    update: (id: number, data: any) => api.put(`/customers/${id}`, data),
+    delete: (id: number) => api.delete(`/customers/${id}`),
+    getStats: () => api.get('/customers/stats/overview'),
+};
+
+// Purchases (v3.0.0)
+export const purchases = {
+    getAll: (params?: any) => api.get('/purchases', { params }),
+    getRecent: (limit?: number) => api.get('/purchases/recent', { params: { limit } }),
+    create: (data: any) => api.post('/purchases', data),
+    update: (id: number, data: any) => api.put(`/purchases/${id}`, data),
+    delete: (id: number) => api.delete(`/purchases/${id}`),
+};
+
+// Campaigns (v3.0.0)
+export const campaigns = {
+    getAll: () => api.get('/campaigns'),
+    getOne: (id: number) => api.get(`/campaigns/${id}`),
+    create: (data: any) => api.post('/campaigns', data),
+    preview: (id: number) => api.post(`/campaigns/${id}/preview`),
+    send: (id: number) => api.post(`/campaigns/${id}/send`),
+    getSends: (id: number) => api.get(`/campaigns/${id}/sends`),
+    delete: (id: number) => api.delete(`/campaigns/${id}`),
+};
+
+// Insights (v3.0.0)
+export const insights = {
+    getRevenueTrends: (period?: string) => api.get('/insights/revenue-trends', { params: { period } }),
+    getCustomerStats: (period?: string) => api.get('/insights/customer-stats', { params: { period } }),
+    getPurchasePatterns: (period?: string) => api.get('/insights/purchase-patterns', { params: { period } }),
+    getRevenueByLocation: (period?: string) => api.get('/insights/revenue-by-location', { params: { period } }),
+    exportData: (data: any) => api.post('/insights/export', data),
+};
+
+// Contacts (legacy - kept for backwards compatibility)
 export const contacts = {
     getAll: (params?: any) => api.get('/contacts', { params }),
     getOne: (id: number) => api.get(`/contacts/${id}`),
@@ -35,7 +74,7 @@ export const contacts = {
     delete: (id: number) => api.delete(`/contacts/${id}`),
 };
 
-// Deals
+// Deals (legacy)
 export const deals = {
     getAll: (params?: any) => api.get('/deals', { params }),
     getOne: (id: number) => api.get(`/deals/${id}`),
@@ -45,7 +84,7 @@ export const deals = {
     getPipelineStats: () => api.get('/deals/stats/pipeline'),
 };
 
-// Activities
+// Activities (legacy)
 export const activities = {
     getAll: (params?: any) => api.get('/activities', { params }),
     create: (data: any) => api.post('/activities', data),
@@ -53,7 +92,7 @@ export const activities = {
     delete: (id: number) => api.delete(`/activities/${id}`),
 };
 
-// Sales
+// Sales (legacy)
 export const sales = {
     getAll: (params?: any) => api.get('/sales', { params }),
     create: (data: any) => api.post('/sales', data),

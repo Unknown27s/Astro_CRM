@@ -16,7 +16,7 @@ A full-featured CRM web application with ML-powered customer segmentation, data 
 - **Visual Analytics**: Interactive scatter plots and charts
 
 ### Data Import
-- **CSV/Excel Support**: Import contacts and sales data from spreadsheets
+- **CSV/XLSX Support**: Import contacts and sales data from spreadsheets
 - **Smart Field Mapping**: Automatic field detection and mapping
 - **Bulk Operations**: Process thousands of records efficiently
 
@@ -30,13 +30,13 @@ A full-featured CRM web application with ML-powered customer segmentation, data 
 ### Backend
 - **Runtime**: Node.js with TypeScript
 - **Framework**: Express.js
-- **Database**: SQLite (better-sqlite3)
+- **Database**: SQLite via sql.js (pure JavaScript)
 - **ML**: Custom K-means implementation
-- **File Processing**: multer, csv-parser, xlsx
-- **Reports**: pdfkit, xlsx
+- **File Processing**: multer, csv-parser, exceljs
+- **Reports**: pdfkit, exceljs
 
 ### Frontend
-- **Framework**: React 18 + TypeScript
+- **Framework**: React + TypeScript
 - **Build Tool**: Vite
 - **Routing**: React Router v6
 - **Styling**: Tailwind CSS
@@ -77,7 +77,7 @@ The frontend will run on `http://localhost:5173`
 
 ### 2. Import Data
 - Navigate to "Import Data"
-- Upload a CSV or Excel file with contacts or sales data
+- Upload a CSV or XLSX file with contacts or sales data
 - Review the field mapping
 - Click "Import Data"
 
@@ -93,7 +93,7 @@ The frontend will run on `http://localhost:5173`
 
 ### 5. Track Sales
 - Visualize your sales pipeline
-- Drag deals between stages
+- Monitor deals by stage
 - Monitor deal values and probabilities
 
 ### 6. Run Analytics

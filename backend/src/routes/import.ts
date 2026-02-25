@@ -1,12 +1,76 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import csvParser from 'csv-parser';
-import XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { createReadStream } from 'fs';
-import { execute, transaction } from '../database/db';
+import { execute, queryOne } from '../database/db';
 import { parseImportData, mapFieldsToSchema } from '../utils/fileParser';
 
 const router = Router();
+
+function normalizeExcelCellValue(value: any): any {
+    if (value === null || value === undefined) {
+        return '';
+    }
+
+    if (value instanceof Date) {
+        return value.toISOString().split('T')[0];
+    }
+
+    if (typeof value === 'object') {
+        if ('text' in value) {
+            return (value as any).text;
+        }
+        if ('result' in value) {
+            return (value as any).result;
+        }
+        return String(value);
+    }
+
+    return value;
+}
+
+async function parseXlsxFile(filePath: string): Promise<any[]> {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+
+    const worksheet = workbook.worksheets[0];
+    if (!worksheet) {
+        return [];
+    }
+
+    const headerRowValues = (worksheet.getRow(1).values as any[]).slice(1);
+    const headers = headerRowValues.map((header) => String(header ?? '').trim());
+
+    const rows: any[] = [];
+    worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) {
+            return;
+        }
+
+        const rowValues = (row.values as any[]).slice(1);
+        const hasContent = rowValues.some((cell) => {
+            const value = normalizeExcelCellValue(cell);
+            return value !== '' && value !== null && value !== undefined;
+        });
+
+        if (!hasContent) {
+            return;
+        }
+
+        const rowObject: Record<string, any> = {};
+        headers.forEach((header, index) => {
+            if (!header) {
+                return;
+            }
+            rowObject[header] = normalizeExcelCellValue(rowValues[index]);
+        });
+
+        rows.push(rowObject);
+    });
+
+    return rows;
+}
 
 // Configure multer for file uploads
 const upload = multer({
@@ -33,7 +97,7 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
             return res.status(400).json({ error: 'No file uploaded' });
         }
 
-        const { importType = 'contacts' } = req.body; // 'contacts' or 'sales'
+        const { importType = 'customers' } = req.body; // 'customers' only
         const filePath = req.file.path;
         const fileExt = req.file.originalname.split('.').pop()?.toLowerCase();
 
@@ -51,11 +115,12 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
             });
         }
         // Parse Excel
-        else if (fileExt === 'xlsx' || fileExt === 'xls') {
-            const workbook = XLSX.readFile(filePath);
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            data = XLSX.utils.sheet_to_json(worksheet);
+        else if (fileExt === 'xlsx') {
+            data = await parseXlsxFile(filePath);
+        } else if (fileExt === 'xls') {
+            return res.status(400).json({
+                error: 'Legacy .xls format is not supported. Please re-save as .xlsx or .csv and upload again.'
+            });
         }
 
         // Return preview and field mapping suggestions
@@ -83,8 +148,18 @@ router.post('/execute', upload.single('file'), async (req: Request, res: Respons
             return res.status(400).json({ error: 'No file uploaded' });
         }
 
-        const { importType = 'contacts', fieldMapping } = req.body;
-        const mapping = JSON.parse(fieldMapping);
+        const { importType = 'customers', fieldMapping } = req.body;
+        
+        if (!fieldMapping) {
+            return res.status(400).json({ error: 'Field mapping is required' });
+        }
+        
+        let mapping: Record<string, string>;
+        try {
+            mapping = JSON.parse(fieldMapping);
+        } catch (parseError) {
+            return res.status(400).json({ error: 'Invalid field mapping format' });
+        }
         const filePath = req.file.path;
         const fileExt = req.file.originalname.split('.').pop()?.toLowerCase();
 
@@ -100,94 +175,81 @@ router.post('/execute', upload.single('file'), async (req: Request, res: Respons
                     .on('end', () => resolve(results))
                     .on('error', reject);
             });
-        } else if (fileExt === 'xlsx' || fileExt === 'xls') {
-            const workbook = XLSX.readFile(filePath);
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            data = XLSX.utils.sheet_to_json(worksheet);
+        } else if (fileExt === 'xlsx') {
+            data = await parseXlsxFile(filePath);
+        } else if (fileExt === 'xls') {
+            return res.status(400).json({
+                error: 'Legacy .xls format is not supported. Please re-save as .xlsx or .csv and upload again.'
+            });
         }
 
-        // Import data based on type
+        // Import data
         let imported = 0;
+        let skipped = 0;
         let errors: any[] = [];
 
-        if (importType === 'contacts') {
-            transaction(() => {
-                data.forEach((row, index) => {
-                    try {
-                        const mappedData: any = {};
-                        Object.keys(mapping).forEach(key => {
-                            const sourceField = mapping[key];
-                            if (sourceField && row[sourceField]) {
-                                mappedData[key] = row[sourceField];
-                            }
-                        });
+        if (importType === 'customers') {
+            data.forEach((row, index) => {
+                try {
+                    const mappedData: any = {};
+                    Object.keys(mapping).forEach(key => {
+                        const sourceField = mapping[key];
+                        if (sourceField && row[sourceField]) {
+                            mappedData[key] = row[sourceField];
+                        }
+                    });
 
-                        execute(
-                            `INSERT INTO contacts (
-                first_name, last_name, email, phone, company, position,
-                address, city, state, country, postal_code, source, status
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                            [
-                                mappedData.first_name || '',
-                                mappedData.last_name || '',
-                                mappedData.email || null,
-                                mappedData.phone || null,
-                                mappedData.company || null,
-                                mappedData.position || null,
-                                mappedData.address || null,
-                                mappedData.city || null,
-                                mappedData.state || null,
-                                mappedData.country || null,
-                                mappedData.postal_code || null,
-                                'Import',
-                                'Active'
-                            ]
-                        );
-                        imported++;
-                    } catch (err: any) {
-                        errors.push({ row: index + 1, error: err.message });
+                    // Validate required field
+                    if (!mappedData.name || mappedData.name.trim() === '') {
+                        throw new Error('Name is required');
                     }
-                });
-            });
-        } else if (importType === 'sales') {
-            transaction(() => {
-                data.forEach((row, index) => {
-                    try {
-                        const mappedData: any = {};
-                        Object.keys(mapping).forEach(key => {
-                            const sourceField = mapping[key];
-                            if (sourceField && row[sourceField]) {
-                                mappedData[key] = row[sourceField];
-                            }
-                        });
 
-                        execute(
-                            `INSERT INTO sales (
-                product_name, quantity, unit_price, total_amount,
-                sale_date, region, category
-              ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                            [
-                                mappedData.product_name || '',
-                                mappedData.quantity || 1,
-                                mappedData.unit_price || 0,
-                                mappedData.total_amount || 0,
-                                mappedData.sale_date || new Date().toISOString().split('T')[0],
-                                mappedData.region || null,
-                                mappedData.category || null
-                            ]
-                        );
-                        imported++;
-                    } catch (err: any) {
-                        errors.push({ row: index + 1, error: err.message });
+                    // Check for duplicate phone number or email
+                    let isDuplicate = false;
+                    
+                    if (mappedData.phone) {
+                        const existingByPhone = queryOne('SELECT id FROM customers WHERE phone = ?', [mappedData.phone]);
+                        if (existingByPhone) {
+                            isDuplicate = true;
+                        }
                     }
-                });
+                    
+                    if (!isDuplicate && mappedData.email) {
+                        const existingByEmail = queryOne('SELECT id FROM customers WHERE email = ?', [mappedData.email]);
+                        if (existingByEmail) {
+                            isDuplicate = true;
+                        }
+                    }
+                    
+                    if (isDuplicate) {
+                        skipped++;
+                        return; // Skip this row
+                    }
+
+                    execute(
+                        `INSERT INTO customers (
+                name, phone, email, location, notes, status
+              ) VALUES (?, ?, ?, ?, ?, ?)`,
+                        [
+                            mappedData.name.trim(),
+                            mappedData.phone || null,
+                            mappedData.email || null,
+                            mappedData.location || null,
+                            mappedData.notes || null,
+                            'Active'
+                        ]
+                    );
+                    imported++;
+                } catch (err: any) {
+                    errors.push({ row: index + 1, error: err.message });
+                }
             });
         }
 
         res.json({
             message: 'Import completed',
             imported,
+            skipped,
             total: data.length,
             errors: errors.length > 0 ? errors.slice(0, 10) : []
         });
