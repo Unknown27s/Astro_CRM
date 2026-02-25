@@ -1,0 +1,21 @@
+product_name,quantity,unit_price,total_amount,sale_date,region,category
+Enterprise License,5,2000,10000,2024-01-15,West,Software
+Cloud Storage,100,50,5000,2024-01-18,East,Services
+Consulting Hours,40,150,6000,2024-01-22,Central,Services
+Premium Support,1,5000,5000,2024-01-25,West,Support
+API Access,10,300,3000,2024-02-01,East,Software
+Training Package,20,200,4000,2024-02-05,West,Services
+Hardware Bundle,3,1500,4500,2024-02-10,Central,Hardware
+Security Suite,8,800,6400,2024-02-14,East,Software
+Data Analytics,1,8000,8000,2024-02-18,West,Software
+Mobile App License,15,400,6000,2024-02-22,Central,Software
+Maintenance Plan,12,250,3000,2024-02-28,East,Support
+Custom Development,60,180,10800,2024-03-05,West,Services
+Integration Service,1,4500,4500,2024-03-10,Central,Services
+Cloud Migration,1,12000,12000,2024-03-15,East,Services
+Performance Monitoring,25,120,3000,2024-03-20,West,Software
+Backup Solution,50,80,4000,2024-03-25,Central,Software
+Collaboration Tools,30,100,3000,2024-04-01,East,Software
+AI Module,2,6000,12000,2024-04-05,West,Software
+Database License,5,1800,9000,2024-04-10,Central,Software
+DevOps Tools,10,500,5000,2024-04-15,East,Software

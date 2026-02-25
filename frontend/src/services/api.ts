@@ -1,0 +1,98 @@
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:3001/api';
+
+const api = axios.create({
+    baseURL: API_BASE_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
+
+// Add auth token to requests
+api.interceptors.request.use((config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
+
+// Auth
+export const auth = {
+    login: (email: string, password: string) =>
+        api.post('/auth/login', { email, password }),
+    register: (email: string, password: string, fullName: string) =>
+        api.post('/auth/register', { email, password, fullName }),
+};
+
+// Contacts
+export const contacts = {
+    getAll: (params?: any) => api.get('/contacts', { params }),
+    getOne: (id: number) => api.get(`/contacts/${id}`),
+    create: (data: any) => api.post('/contacts', data),
+    update: (id: number, data: any) => api.put(`/contacts/${id}`, data),
+    delete: (id: number) => api.delete(`/contacts/${id}`),
+};
+
+// Deals
+export const deals = {
+    getAll: (params?: any) => api.get('/deals', { params }),
+    getOne: (id: number) => api.get(`/deals/${id}`),
+    create: (data: any) => api.post('/deals', data),
+    update: (id: number, data: any) => api.put(`/deals/${id}`, data),
+    delete: (id: number) => api.delete(`/deals/${id}`),
+    getPipelineStats: () => api.get('/deals/stats/pipeline'),
+};
+
+// Activities
+export const activities = {
+    getAll: (params?: any) => api.get('/activities', { params }),
+    create: (data: any) => api.post('/activities', data),
+    update: (id: number, data: any) => api.put(`/activities/${id}`, data),
+    delete: (id: number) => api.delete(`/activities/${id}`),
+};
+
+// Sales
+export const sales = {
+    getAll: (params?: any) => api.get('/sales', { params }),
+    create: (data: any) => api.post('/sales', data),
+    getSummary: (params?: any) => api.get('/sales/stats/summary', { params }),
+    getByRegion: () => api.get('/sales/stats/by-region'),
+    getByCategory: () => api.get('/sales/stats/by-category'),
+};
+
+// Import
+export const importData = {
+    upload: (formData: FormData) =>
+        api.post('/import/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        }),
+    execute: (formData: FormData) =>
+        api.post('/import/execute', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        }),
+};
+
+// Analytics
+export const analytics = {
+    getDashboard: (params?: any) => api.get('/analytics/dashboard', { params }),
+    getSegments: () => api.get('/analytics/segments'),
+    getSegmentCustomers: (segmentId: number) =>
+        api.get(`/analytics/segments/${segmentId}/customers`),
+    segmentCustomers: (numClusters: number) =>
+        api.post('/analytics/segment-customers', { numClusters }),
+    getSalesTrends: (params?: any) => api.get('/analytics/trends/sales', { params }),
+};
+
+// Reports
+export const reports = {
+    generateSales: (data: any) =>
+        api.post('/reports/sales', data, { responseType: 'blob' }),
+    generateCustomers: (data: any) =>
+        api.post('/reports/customers', data, { responseType: 'blob' }),
+    generateSegments: (data: any) =>
+        api.post('/reports/segments', data, { responseType: 'blob' }),
+};
+
+export default api;
