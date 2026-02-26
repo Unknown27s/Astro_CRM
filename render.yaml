@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: astro-crm-api
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+
+  - type: static
+    name: astro-crm-web
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://astro-crm-api.onrender.com/api
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
