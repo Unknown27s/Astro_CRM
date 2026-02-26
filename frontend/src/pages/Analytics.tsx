@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { analytics } from '../services/api';
 import {
     ScatterChart,
@@ -9,7 +9,6 @@ import {
     Tooltip,
     Legend,
     ResponsiveContainer,
-    Cell,
 } from 'recharts';
 import { Sparkles, Users } from 'lucide-react';
 
@@ -60,17 +59,13 @@ export default function Analytics() {
         }
     };
 
-    // Prepare scatter plot data
-    const scatterData = segments.flatMap((segment, index) =>
-        Array(segment.customer_count || 0)
-            .fill(null)
-            .map(() => ({
-                segment: segment.segment_name,
-                value: segment.avg_value + (Math.random() - 0.5) * 1000,
-                frequency: segment.avg_frequency + (Math.random() - 0.5) * 2,
-                color: COLORS[index % COLORS.length],
-            }))
-    );
+    // Use actual aggregate points from backend (one point per segment)
+    const scatterData = segments.map((segment, index) => ({
+        segment: segment.segment_name,
+        value: Number(segment.avg_value || 0),
+        frequency: Number(segment.avg_frequency || 0),
+        color: COLORS[index % COLORS.length],
+    }));
 
     return (
         <div className="space-y-6">

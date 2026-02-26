@@ -1,7 +1,7 @@
 {
     "name": "crm-backend",
-    "version": "1.0.0",
-    "description": "CRM Backend API with ML Analytics",
+    "version": "3.0.0",
+    "description": "CRM Backend API - Retail Edition - Phase 3: Customer Purchase Tracking + SMS Campaigns",
     "main": "dist/server.js",
     "scripts": {
         "dev": "tsx watch src/server.ts",
@@ -20,9 +20,9 @@
         "express": "^4.18.2",
         "cors": "^2.8.5",
         "sql.js": "^1.10.3",
-        "multer": "^1.4.5-lts.1",
+        "multer": "^2.0.2",
         "csv-parser": "^3.0.0",
-        "xlsx": "^0.18.5",
+        "exceljs": "^4.4.0",
         "jsonwebtoken": "^9.0.2",
         "pdfkit": "^0.14.0",
         "dotenv": "^16.3.1"
@@ -30,7 +30,7 @@
     "devDependencies": {
         "@types/express": "^4.17.21",
         "@types/cors": "^2.8.17",
-        "@types/multer": "^1.4.11",
+        "@types/multer": "^2.0.0",
         "@types/jsonwebtoken": "^9.0.5",
         "@types/pdfkit": "^0.13.3",
         "@types/node": "^20.10.6",

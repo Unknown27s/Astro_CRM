@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { contacts } from '../services/api';
 import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 
@@ -6,8 +6,8 @@ export default function Contacts() {
     const [contactList, setContactList] = useState<any[]>([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
-    const [showModal, setShowModal] = useState(false);
-    const [editingContact, setEditingContact] = useState<any>(null);
+    const [, setShowModal] = useState(false);
+    const [, setEditingContact] = useState<any>(null);
 
     useEffect(() => {
         loadContacts();

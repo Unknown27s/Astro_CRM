@@ -54,13 +54,25 @@ router.post('/', (req: Request, res: Response) => {
             total_amount, sale_date, region, category
         } = req.body;
 
+        if (!product_name) {
+            return res.status(400).json({ error: 'Product name is required' });
+        }
+
+        const quantityNumber = Math.max(1, Number(quantity) || 1);
+        const unitPriceNumber = Math.max(0, Number(unit_price) || 0);
+        const providedTotal = Number(total_amount);
+        const totalAmountNumber = Number.isFinite(providedTotal) && providedTotal > 0
+            ? providedTotal
+            : quantityNumber * unitPriceNumber;
+        const saleDateValue = sale_date || new Date().toISOString().split('T')[0];
+
         const result = execute(
             `INSERT INTO sales (
         contact_id, deal_id, product_name, quantity, unit_price,
         total_amount, sale_date, region, category
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [contact_id, deal_id, product_name, quantity || 1, unit_price || 0,
-                total_amount || 0, sale_date, region, category]
+            [contact_id, deal_id, product_name, quantityNumber, unitPriceNumber,
+                totalAmountNumber, saleDateValue, region, category]
         );
 
         const sale = queryOne('SELECT * FROM sales WHERE id = ?', [result.lastInsertRowid]);

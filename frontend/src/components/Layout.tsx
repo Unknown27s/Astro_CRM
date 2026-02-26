@@ -1,43 +1,45 @@
-import React from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
     Users,
-    DollarSign,
+    Send,
     BarChart3,
-    FileText,
     Upload,
     LogOut,
 } from 'lucide-react';
 
-export default function Layout() {
+interface LayoutProps {
+    setAuth: (value: boolean) => void;
+}
+
+export default function Layout({ setAuth }: LayoutProps) {
     const location = useLocation();
     const navigate = useNavigate();
 
     const handleLogout = () => {
         localStorage.removeItem('token');
+        setAuth(false);
         navigate('/login');
     };
 
     const navItems = [
         { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-        { path: '/contacts', icon: Users, label: 'Contacts' },
-        { path: '/sales', icon: DollarSign, label: 'Sales' },
-        { path: '/analytics', icon: BarChart3, label: 'Analytics' },
-        { path: '/reports', icon: FileText, label: 'Reports' },
+        { path: '/customers', icon: Users, label: 'Customers' },
+        { path: '/campaigns', icon: Send, label: 'Campaigns' },
+        { path: '/insights', icon: BarChart3, label: 'Insights' },
         { path: '/import', icon: Upload, label: 'Import Data' },
     ];
 
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Sidebar */}
-            <aside className="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-indigo-900 to-indigo-700 text-white shadow-xl">
+            <aside className="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-indigo-900 to-indigo-700 text-white shadow-xl flex flex-col">
                 <div className="p-6">
-                    <h1 className="text-2xl font-bold">CRM Pro</h1>
-                    <p className="text-indigo-200 text-sm mt-1">Analytics & Insights</p>
+                    <h1 className="text-2xl font-bold">Retail CRM</h1>
+                    <p className="text-indigo-200 text-sm mt-1">Purchase & Campaign Tracking</p>
                 </div>
 
-                <nav className="mt-6">
+                <nav className="mt-6 flex-1">
                     {navItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = location.pathname === item.path;
@@ -57,9 +59,15 @@ export default function Layout() {
                     })}
                 </nav>
 
+                <div className="p-4 border-t border-white/10">
+                    <p className="text-xs text-indigo-200 text-center">
+                        v3.0.0 - Retail Edition
+                    </p>
+                </div>
+
                 <button
                     onClick={handleLogout}
-                    className="absolute bottom-6 left-6 right-6 flex items-center gap-3 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all"
+                    className="m-4 flex items-center gap-3 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all"
                 >
                     <LogOut size={20} />
                     <span>Logout</span>

@@ -2,10 +2,9 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
-import Contacts from './pages/Contacts';
-import Sales from './pages/Sales';
-import Analytics from './pages/Analytics';
-import Reports from './pages/Reports';
+import Customers from './pages/Customers';
+import Campaigns from './pages/Campaigns';
+import Insights from './pages/Insights';
 import Import from './pages/Import';
 import Login from './pages/Login';
 
@@ -20,12 +19,11 @@ function App() {
         <Route path="/login" element={<Login setAuth={setIsAuthenticated} />} />
 
         {isAuthenticated ? (
-          <Route path="/" element={<Layout />}>
+          <Route path="/" element={<Layout setAuth={setIsAuthenticated} />}>
             <Route index element={<Dashboard />} />
-            <Route path="contacts" element={<Contacts />} />
-            <Route path="sales" element={<Sales />} />
-            <Route path="analytics" element={<Analytics />} />
-            <Route path="reports" element={<Reports />} />
+            <Route path="customers" element={<Customers />} />
+            <Route path="campaigns" element={<Campaigns />} />
+            <Route path="insights" element={<Insights />} />
             <Route path="import" element={<Import />} />
           </Route>
         ) : (
