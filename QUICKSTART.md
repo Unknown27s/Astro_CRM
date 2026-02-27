@@ -9,7 +9,16 @@ For one-place install commands, see: `INSTALL_REQUIREMENTS.md`
 - **Node.js**: v18 or newer
 - **npm**: comes with Node.js
 
-This project has two dependency packs:
+This project is a **full-stack application** with two separate services that each require their own `npm` process:
+
+| Service | Directory | Port | Role |
+|---------|-----------|------|------|
+| **Backend** | `backend/` | `3001` | REST API, SQLite database, authentication |
+| **Frontend** | `frontend/` | `5173` | React UI served by Vite |
+
+Both processes must run **at the same time** in separate terminal windows — the frontend calls the backend API over HTTP, exactly as it would in production.
+
+This project therefore has two dependency packs:
 
 1. **Backend pack** (`backend/package.json`) — API, database, import/export, auth
 2. **Frontend pack** (`frontend/package.json`) — React UI, charts, tables, routing

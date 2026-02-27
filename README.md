@@ -165,14 +165,75 @@ The application uses a custom K-means clustering implementation with:
 - RFM (Recency, Frequency, Monetary) features
 - Automatic segment naming based on characteristics
 
-## Future Enhancements
+## Why Are There Two npm Processes?
 
-- Email integration
-- Calendar sync
-- Mobile app with Capacitor
-- Advanced predictive analytics
-- Real-time collaboration
-- Custom dashboards
+This project is a **full-stack application** split into two independent services that each need their own process:
+
+| Service | Directory | Port | Purpose |
+|---------|-----------|------|---------|
+| **Backend** | `backend/` | `3001` | REST API, database (SQLite), authentication, file processing |
+| **Frontend** | `frontend/` | `5173` | React UI, served by Vite dev server |
+
+The backend and frontend are kept separate so that:
+- The backend can be deployed independently (e.g., on Render/Railway) while the frontend is hosted as a static site (e.g., on Netlify).
+- Each service has its own dependencies and can be updated or scaled without affecting the other.
+- Local development mirrors the production architecture — the frontend makes HTTP requests to the backend API, just as it would in production.
+
+You must run **both** at the same time (in two terminal windows/tabs):
+
+```bash
+# Terminal 1 — Backend
+cd backend
+npm run dev
+
+# Terminal 2 — Frontend
+cd frontend
+npm run dev
+```
+
+## Future Enhancements (Next Update)
+
+The following features are planned for the next release:
+
+### 🔔 Notifications & Reminders
+- In-app notification centre for campaign delivery updates
+- Scheduled reminders for follow-up activities
+
+### 📧 Email Integration
+- Send emails directly from customer profiles
+- Email open/click tracking within campaigns
+- SMTP and SendGrid support
+
+### 📅 Calendar Sync
+- Two-way sync with Google Calendar and Outlook
+- Schedule activities and see them in a unified calendar view
+
+### 📱 Mobile App (Capacitor)
+- Native iOS and Android app built from the existing React codebase
+- Push notifications for campaign results and reminders
+
+### 🤖 Advanced Predictive Analytics
+- Churn prediction model using purchase-history signals
+- Next-purchase date forecasting per customer
+- Revenue forecasting for the next 30/60/90 days
+
+### 👥 Real-Time Collaboration
+- Multiple users can work simultaneously with live data updates via WebSockets
+- Presence indicators showing who is viewing a customer profile
+
+### 🎛️ Custom Dashboards
+- Drag-and-drop dashboard widget builder
+- Save and share personalised dashboard layouts
+
+### 🔗 Third-Party Integrations
+- Twilio integration for real SMS delivery (replace simulation)
+- WhatsApp Business API support for campaigns
+- Zapier/Make webhook support for automation
+
+### 🛡️ Security & Access Control
+- Role-based access control (Admin, Manager, Staff)
+- Audit log of all data changes
+- Two-factor authentication (2FA)
 
 ## License
 
