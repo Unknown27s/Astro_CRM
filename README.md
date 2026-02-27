@@ -1,5 +1,14 @@
 # CRM Pro - Customer Relationship Management System
 
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)
+![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)
+![Express](https://img.shields.io/badge/Express.js-4-000000?logo=express&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-sql.js-003B57?logo=sqlite&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-yellow)
+
 A full-featured CRM web application with ML-powered customer segmentation, data import capabilities, and comprehensive reporting.
 
 ## Features
@@ -38,7 +47,7 @@ A full-featured CRM web application with ML-powered customer segmentation, data 
 ### Frontend
 - **Framework**: React + TypeScript
 - **Build Tool**: Vite
-- **Routing**: React Router v6
+- **Routing**: React Router v7
 - **Styling**: Tailwind CSS
 - **Charts**: Recharts
 - **Icons**: Lucide React
