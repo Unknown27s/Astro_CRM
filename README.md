@@ -58,6 +58,31 @@ A full-featured CRM web application with ML-powered customer segmentation, data 
 ### Prerequisites
 - Node.js 18+ and npm
 
+### Quick Commands (Windows PowerShell)
+
+Install all dependencies:
+
+```powershell
+cd backend; npm install
+cd ..\frontend; npm install
+```
+
+Run app in 2 terminals:
+
+**Terminal 1 (Backend)**
+```powershell
+cd backend
+npm run dev
+```
+
+**Terminal 2 (Frontend)**
+```powershell
+cd frontend
+npm run dev
+```
+
+Open: `http://localhost:5173`
+
 ### Backend Setup
 
 ```bash
@@ -77,6 +102,24 @@ npm run dev
 ```
 
 The frontend will run on `http://localhost:5173`
+
+## Update & Publish (Git)
+
+Use these commands when you make changes and want to publish them:
+
+```powershell
+git status
+git add .
+git commit -m "your update message"
+git push origin copilot/determine-stack-used
+```
+
+Helpful checks:
+
+```powershell
+git branch --show-current
+git status -sb
+```
 
 ## Usage
 
