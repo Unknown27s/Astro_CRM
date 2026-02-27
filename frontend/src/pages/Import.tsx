@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { importData } from '../services/api';
+import toast from 'react-hot-toast';
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function Import() {
@@ -28,7 +29,7 @@ export default function Import() {
             setFieldMapping(response.data.suggestedMapping);
         } catch (error) {
             console.error('Error uploading file:', error);
-            alert('Error uploading file');
+            toast.error('Error uploading file');
         }
     };
 
@@ -46,7 +47,7 @@ export default function Import() {
             setResult(response.data);
         } catch (error) {
             console.error('Error importing data:', error);
-            alert('Error importing data');
+            toast.error('Error importing data');
         } finally {
             setImporting(false);
         }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { customers, purchases, insights } from '../services/api';
 import {
     LineChart,
@@ -10,19 +10,19 @@ import {
     Legend,
     ResponsiveContainer,
 } from 'recharts';
-import { Users, DollarSign, TrendingUp, ShoppingBag } from 'lucide-react';
+import { Users, DollarSign, TrendingUp, ShoppingBag, RefreshCw } from 'lucide-react';
+
+const REFRESH_INTERVAL = 60000; // 60 seconds
 
 export default function Dashboard() {
     const [stats, setStats] = useState<any>(null);
     const [revenueTrends, setRevenueTrends] = useState <any[]>([]);
     const [recentPurchases, setRecentPurchases] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
-    useEffect(() => {
-        loadDashboard();
-    }, []);
-
-    const loadDashboard = async () => {
+    const loadDashboard = useCallback(async (showLoader = false) => {
+        if (showLoader) setLoading(true);
         try {
             const [customerRes, revRes, recentRes] = await Promise.all([
                 customers.getStats(),
@@ -32,12 +32,19 @@ export default function Dashboard() {
             setStats(customerRes.data);
             setRevenueTrends(revRes.data.trends || []);
             setRecentPurchases(recentRes.data.purchases || []);
+            setLastRefresh(new Date());
         } catch (error) {
             console.error('Error loading dashboard:', error);
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        loadDashboard(true);
+        const interval = setInterval(() => loadDashboard(false), REFRESH_INTERVAL);
+        return () => clearInterval(interval);
+    }, [loadDashboard]);
 
     if (loading) {
         return (
@@ -76,9 +83,20 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-                <p className="text-gray-600 mt-1">Welcome to your retail CRM overview</p>
+            <div className="flex justify-between items-start">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
+                    <p className="text-gray-600 mt-1">Welcome to your retail CRM overview</p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-400">
+                        Updated {lastRefresh.toLocaleTimeString()}
+                    </span>
+                    <button onClick={() => loadDashboard(false)}
+                        className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors" title="Refresh now">
+                        <RefreshCw size={16} />
+                    </button>
+                </div>
             </div>
 
             {/* Stats Grid */}

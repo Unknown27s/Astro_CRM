@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { reports } from '../services/api';
+import toast from 'react-hot-toast';
 import { FileDown, Calendar } from 'lucide-react';
 
 export default function Reports() {
@@ -36,7 +37,7 @@ export default function Reports() {
             link.remove();
         } catch (error) {
             console.error('Error generating report:', error);
-            alert('Error generating report');
+            toast.error('Error generating report');
         } finally {
             setGenerating(false);
         }

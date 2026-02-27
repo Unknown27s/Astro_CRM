@@ -6,6 +6,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { initializeDatabase } from './database/db';
 import { migrateToV3 } from './database/migrate-v3';
+import { migrateShop } from './database/migrate-shop';
 import customersRouter from './routes/customers';
 import purchasesRouter from './routes/purchases';
 import campaignsRouter from './routes/campaigns';
@@ -14,6 +15,10 @@ import importRouter from './routes/import';
 import analyticsRouter from './routes/analytics';
 import authRouter from './routes/auth';
 import adminRouter from './routes/admin';
+import reportsRouter from './routes/reports';
+import productsRouter from './routes/products';
+import shopRouter from './routes/shop';
+import couponsRouter from './routes/coupons';
 
 dotenv.config();
 
@@ -38,7 +43,12 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 // Basic auth middleware for protected API routes
 app.use((req: Request, res: Response, next: NextFunction) => {
-    const isPublicRoute = req.path.startsWith('/api/auth') || req.path === '/api/health';
+    const isPublicRoute =
+        req.path.startsWith('/api/auth') ||
+        req.path === '/api/health' ||
+        req.path === '/api/shop/storefront' ||
+        req.path === '/api/shop/order' ||
+        req.path === '/api/shop/validate-coupon';
     if (isPublicRoute || req.method === 'OPTIONS') {
         return next();
     }
@@ -70,6 +80,10 @@ app.use('/api/insights', insightsRouter);
 app.use('/api/import', importRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/reports', reportsRouter);
+app.use('/api/products', productsRouter);
+app.use('/api/shop', shopRouter);
+app.use('/api/coupons', couponsRouter);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {
@@ -94,6 +108,7 @@ async function startServer() {
         // Run v3.0.0 migration
         console.log('🔄 Running v3.0.0 migration...');
         await migrateToV3();
+        await migrateShop();
         
         app.listen(PORT, () => {
             console.log(`🚀 CRM API Server v${VERSION} - Retail Edition`);

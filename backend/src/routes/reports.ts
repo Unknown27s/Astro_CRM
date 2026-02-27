@@ -262,4 +262,157 @@ router.post('/segments', async (req: Request, res: Response) => {
     }
 });
 
+// Generate comprehensive monthly report data
+router.post('/monthly', async (req: Request, res: Response) => {
+    try {
+        const { month, year } = req.body;
+        const monthStr = String(month).padStart(2, '0');
+        const yearStr = String(year);
+        const monthPrefix = `${yearStr}-${monthStr}`;
+
+        // Daily revenue for the month
+        const dailyRevenue = query(
+            `SELECT DATE(purchase_date) as date, COUNT(*) as purchase_count, SUM(total_amount) as revenue
+             FROM purchases
+             WHERE strftime('%Y-%m', purchase_date) = ?
+             GROUP BY DATE(purchase_date)
+             ORDER BY date ASC`,
+            [monthPrefix]
+        );
+
+        // Monthly summary
+        const summary = query(
+            `SELECT COUNT(*) as total_purchases, SUM(total_amount) as total_revenue, AVG(total_amount) as avg_transaction
+             FROM purchases
+             WHERE strftime('%Y-%m', purchase_date) = ?`,
+            [monthPrefix]
+        )[0];
+
+        // Previous month for comparison
+        const prevDate = new Date(Number(yearStr), Number(monthStr) - 2, 1);
+        const prevMonthStr = String(prevDate.getMonth() + 1).padStart(2, '0');
+        const prevYearStr = String(prevDate.getFullYear());
+        const prevMonthPrefix = `${prevYearStr}-${prevMonthStr}`;
+
+        const prevSummary = query(
+            `SELECT SUM(total_amount) as total_revenue FROM purchases WHERE strftime('%Y-%m', purchase_date) = ?`,
+            [prevMonthPrefix]
+        )[0];
+
+        const currentRevenue = (summary as any)?.total_revenue || 0;
+        const prevRevenue = (prevSummary as any)?.total_revenue || 0;
+        const growth = prevRevenue > 0 ? ((currentRevenue - prevRevenue) / prevRevenue) * 100 : 0;
+
+        // Customer stats
+        const customerStats = query(
+            `SELECT
+                COUNT(*) as total_customers,
+                COUNT(CASE WHEN status = 'Active' THEN 1 END) as active_customers,
+                COUNT(CASE WHEN status = 'VIP' THEN 1 END) as vip_customers,
+                COUNT(CASE WHEN status = 'Inactive' THEN 1 END) as inactive_customers
+             FROM customers`
+        )[0];
+
+        // New customers this month
+        const newCustomers = query(
+            `SELECT COUNT(*) as count FROM customers WHERE strftime('%Y-%m', created_at) = ?`,
+            [monthPrefix]
+        )[0];
+
+        // Top customers this month
+        const topCustomers = query(
+            `SELECT c.name, c.phone, c.location, SUM(p.total_amount) as spent, COUNT(p.id) as purchases
+             FROM purchases p
+             LEFT JOIN customers c ON p.customer_id = c.id
+             WHERE strftime('%Y-%m', p.purchase_date) = ?
+             GROUP BY p.customer_id
+             ORDER BY spent DESC
+             LIMIT 10`,
+            [monthPrefix]
+        );
+
+        // Purchase by day of week
+        const byDayOfWeek = query(
+            `SELECT
+                CASE CAST(strftime('%w', purchase_date) AS INTEGER)
+                    WHEN 0 THEN 'Sun' WHEN 1 THEN 'Mon' WHEN 2 THEN 'Tue'
+                    WHEN 3 THEN 'Wed' WHEN 4 THEN 'Thu' WHEN 5 THEN 'Fri' WHEN 6 THEN 'Sat'
+                END as day_name,
+                COUNT(*) as purchase_count,
+                SUM(total_amount) as revenue
+             FROM purchases
+             WHERE strftime('%Y-%m', purchase_date) = ?
+             GROUP BY strftime('%w', purchase_date)
+             ORDER BY CAST(strftime('%w', purchase_date) AS INTEGER)`,
+            [monthPrefix]
+        );
+
+        // Payment methods
+        const byPaymentMethod = query(
+            `SELECT COALESCE(payment_method, 'Unknown') as payment_method, COUNT(*) as count, SUM(total_amount) as revenue
+             FROM purchases
+             WHERE strftime('%Y-%m', purchase_date) = ?
+             GROUP BY payment_method
+             ORDER BY count DESC`,
+            [monthPrefix]
+        );
+
+        // Revenue by location
+        const byLocation = query(
+            `SELECT COALESCE(c.location, 'Unknown') as location, COUNT(p.id) as purchase_count, SUM(p.total_amount) as revenue
+             FROM purchases p
+             LEFT JOIN customers c ON p.customer_id = c.id
+             WHERE strftime('%Y-%m', p.purchase_date) = ?
+             GROUP BY c.location
+             ORDER BY revenue DESC
+             LIMIT 8`,
+            [monthPrefix]
+        );
+
+        // Top items this month
+        const purchasesForItems = query(
+            `SELECT items FROM purchases WHERE strftime('%Y-%m', purchase_date) = ?`,
+            [monthPrefix]
+        );
+
+        const itemCounts: Record<string, { count: number; revenue: number }> = {};
+        (purchasesForItems as any[]).forEach((p) => {
+            try {
+                const items = JSON.parse(p.items || '[]');
+                items.forEach((item: any) => {
+                    const name = item.name || 'Unknown';
+                    if (!itemCounts[name]) itemCounts[name] = { count: 0, revenue: 0 };
+                    itemCounts[name].count += item.qty || 1;
+                    itemCounts[name].revenue += (item.qty || 1) * (item.price || 0);
+                });
+            } catch (e) {}
+        });
+
+        const topItems = Object.entries(itemCounts)
+            .map(([name, data]) => ({ name, ...data }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 10);
+
+        res.json({
+            month: Number(month),
+            year: Number(year),
+            month_prefix: monthPrefix,
+            summary: {
+                ...(summary as any),
+                growth_percentage: Number(growth.toFixed(2))
+            },
+            daily_revenue: dailyRevenue,
+            customer_stats: customerStats,
+            new_customers: (newCustomers as any)?.count || 0,
+            top_customers: topCustomers,
+            by_day_of_week: byDayOfWeek,
+            by_payment_method: byPaymentMethod,
+            by_location: byLocation,
+            top_items: topItems
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 export default router;

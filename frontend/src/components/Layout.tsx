@@ -6,6 +6,7 @@ import {
     BarChart3,
     Upload,
     LogOut,
+    ShoppingBag,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -27,6 +28,7 @@ export default function Layout({ setAuth }: LayoutProps) {
         { path: '/customers', icon: Users, label: 'Customers' },
         { path: '/campaigns', icon: Send, label: 'Campaigns' },
         { path: '/insights', icon: BarChart3, label: 'Insights' },
+        { path: '/online-store', icon: ShoppingBag, label: 'Online Store' },
         { path: '/import', icon: Upload, label: 'Import Data' },
     ];
 

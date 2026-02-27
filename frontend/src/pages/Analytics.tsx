@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { analytics } from '../services/api';
+import toast from 'react-hot-toast';
 import {
     ScatterChart,
     Scatter,
@@ -41,9 +42,9 @@ export default function Analytics() {
         try {
             await analytics.segmentCustomers(4);
             await loadSegments();
-            alert('Customer segmentation completed successfully!');
+            toast.success('Customer segmentation completed successfully!');
         } catch (error: any) {
-            alert(error.response?.data?.error || 'Error performing segmentation');
+            toast.error(error.response?.data?.error || 'Error performing segmentation');
         } finally {
             setClustering(false);
         }

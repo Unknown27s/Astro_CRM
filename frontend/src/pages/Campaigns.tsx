@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { campaigns } from '../services/api';
+import toast from 'react-hot-toast';
 import { Send, Plus, MessageCircle, Users, Check } from 'lucide-react';
 
 export default function Campaigns() {
@@ -31,7 +32,7 @@ export default function Campaigns() {
 
     const handleCreateCampaign = async () => {
         if (!newCampaign.name.trim() || !newCampaign.message.trim()) {
-            alert('Name and message are required');
+            toast.error('Name and message are required');
             return;
         }
 
@@ -49,7 +50,7 @@ export default function Campaigns() {
             // Auto-preview the new campaign
             handlePreview(response.data);
         } catch (error: any) {
-            alert(error.response?.data?.error || 'Error creating campaign');
+            toast.error(error.response?.data?.error || 'Error creating campaign');
         } finally {
             setLoading(false);
         }
@@ -73,12 +74,12 @@ export default function Campaigns() {
         setLoading(true);
         try {
             await campaigns.send(campaignId);
-            alert('Campaign sent successfully!');
+            toast.success('Campaign sent successfully!');
             fetchCampaigns();
             setSelectedCampaign(null);
             setPreview(null);
         } catch (error: any) {
-            alert(error.response?.data?.error || 'Error sending campaign');
+            toast.error(error.response?.data?.error || 'Error sending campaign');
         } finally {
             setLoading(false);
         }

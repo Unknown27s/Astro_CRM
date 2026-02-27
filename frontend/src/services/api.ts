@@ -65,42 +65,6 @@ export const insights = {
     exportData: (data: any) => api.post('/insights/export', data),
 };
 
-// Contacts (legacy - kept for backwards compatibility)
-export const contacts = {
-    getAll: (params?: any) => api.get('/contacts', { params }),
-    getOne: (id: number) => api.get(`/contacts/${id}`),
-    create: (data: any) => api.post('/contacts', data),
-    update: (id: number, data: any) => api.put(`/contacts/${id}`, data),
-    delete: (id: number) => api.delete(`/contacts/${id}`),
-};
-
-// Deals (legacy)
-export const deals = {
-    getAll: (params?: any) => api.get('/deals', { params }),
-    getOne: (id: number) => api.get(`/deals/${id}`),
-    create: (data: any) => api.post('/deals', data),
-    update: (id: number, data: any) => api.put(`/deals/${id}`, data),
-    delete: (id: number) => api.delete(`/deals/${id}`),
-    getPipelineStats: () => api.get('/deals/stats/pipeline'),
-};
-
-// Activities (legacy)
-export const activities = {
-    getAll: (params?: any) => api.get('/activities', { params }),
-    create: (data: any) => api.post('/activities', data),
-    update: (id: number, data: any) => api.put(`/activities/${id}`, data),
-    delete: (id: number) => api.delete(`/activities/${id}`),
-};
-
-// Sales (legacy)
-export const sales = {
-    getAll: (params?: any) => api.get('/sales', { params }),
-    create: (data: any) => api.post('/sales', data),
-    getSummary: (params?: any) => api.get('/sales/stats/summary', { params }),
-    getByRegion: () => api.get('/sales/stats/by-region'),
-    getByCategory: () => api.get('/sales/stats/by-category'),
-};
-
 // Import
 export const importData = {
     upload: (formData: FormData) =>
@@ -132,6 +96,44 @@ export const reports = {
         api.post('/reports/customers', data, { responseType: 'blob' }),
     generateSegments: (data: any) =>
         api.post('/reports/segments', data, { responseType: 'blob' }),
+    getMonthlyData: (month: number, year: number) =>
+        api.post('/reports/monthly', { month, year }),
+};
+
+// Products (admin)
+export const products = {
+    getAll: () => api.get('/products'),
+    create: (data: any) => api.post('/products', data),
+    update: (id: number, data: any) => api.put(`/products/${id}`, data),
+    delete: (id: number) => api.delete(`/products/${id}`),
+    toggleVisibility: (id: number) => api.patch(`/products/${id}/toggle-visibility`),
+    toggleStock: (id: number) => api.patch(`/products/${id}/toggle-stock`),
+};
+
+// Shop (admin settings + public storefront)
+export const shop = {
+    getSettings: () => api.get('/shop/settings'),
+    updateSettings: (data: any) => api.put('/shop/settings', data),
+    getOrders: () => api.get('/shop/orders'),
+    updateOrderStatus: (id: number, status: string) => api.patch(`/shop/orders/${id}`, { status }),
+    deleteOrder: (id: number) => api.delete(`/shop/orders/${id}`),
+};
+
+// Coupons (admin)
+export const coupons = {
+    getAll: () => api.get('/coupons'),
+    create: (data: any) => api.post('/coupons', data),
+    update: (id: number, data: any) => api.put(`/coupons/${id}`, data),
+    delete: (id: number) => api.delete(`/coupons/${id}`),
+    toggle: (id: number) => api.patch(`/coupons/${id}/toggle`),
+};
+
+// Public shop (no auth needed — uses base axios without interceptor)
+const publicApi = axios.create({ baseURL: API_BASE_URL });
+export const publicShop = {
+    getStorefront: () => publicApi.get('/shop/storefront'),
+    placeOrder: (data: any) => publicApi.post('/shop/order', data),
+    validateCoupon: (code: string, cart_total: number) => publicApi.post('/shop/validate-coupon', { code, cart_total }),
 };
 
 export default api;
