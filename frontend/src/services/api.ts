@@ -98,6 +98,10 @@ export const reports = {
         api.post('/reports/segments', data, { responseType: 'blob' }),
     getMonthlyData: (month: number, year: number) =>
         api.post('/reports/monthly', { month, year }),
+    getMonthlyAiReport: (month: number, year: number) =>
+        api.post('/reports/monthly', { month, year, include_ai: true }),
+    downloadMonthlyBusinessReport: (month: number, year: number, format: 'pdf' | 'excel' = 'pdf') =>
+        api.post('/reports/monthly/download', { month, year, format, include_ai: true }, { responseType: 'blob' }),
 };
 
 // Products (admin)
@@ -126,6 +130,12 @@ export const coupons = {
     update: (id: number, data: any) => api.put(`/coupons/${id}`, data),
     delete: (id: number) => api.delete(`/coupons/${id}`),
     toggle: (id: number) => api.patch(`/coupons/${id}/toggle`),
+};
+
+// AI Chat
+export const aiChat = {
+    send: (messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>) =>
+        api.post('/chat', { messages }),
 };
 
 // Public shop (no auth needed — uses base axios without interceptor)

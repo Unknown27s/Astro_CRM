@@ -19,6 +19,7 @@ import reportsRouter from './routes/reports';
 import productsRouter from './routes/products';
 import shopRouter from './routes/shop';
 import couponsRouter from './routes/coupons';
+import chatRouter from './routes/chat';
 
 dotenv.config();
 
@@ -45,6 +46,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.use((req: Request, res: Response, next: NextFunction) => {
     const isPublicRoute =
         req.path.startsWith('/api/auth') ||
+        req.path.startsWith('/api/chat') ||
         req.path === '/api/health' ||
         req.path === '/api/shop/storefront' ||
         req.path === '/api/shop/order' ||
@@ -84,6 +86,7 @@ app.use('/api/reports', reportsRouter);
 app.use('/api/products', productsRouter);
 app.use('/api/shop', shopRouter);
 app.use('/api/coupons', couponsRouter);
+app.use('/api/chat', chatRouter);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {

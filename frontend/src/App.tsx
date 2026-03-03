@@ -12,6 +12,7 @@ import OnlineStore from './pages/OnlineStore';
 import Shop from './pages/Shop';
 import Analytics from './pages/Analytics';
 import Reports from './pages/Reports';
+import AIAssistant from './components/AIAssistant';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = React.useState(
@@ -46,6 +47,7 @@ function App() {
           <Route path="*" element={<Navigate to="/login" replace />} />
         )}
       </Routes>
+      <AIAssistant />
     </BrowserRouter>
   );
 }

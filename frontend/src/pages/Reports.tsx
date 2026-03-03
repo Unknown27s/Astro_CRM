@@ -3,12 +3,24 @@ import { reports } from '../services/api';
 import toast from 'react-hot-toast';
 import { FileDown, Calendar } from 'lucide-react';
 
+type AiReportItem = {
+    section: string;
+    title: string;
+    details: string;
+};
+
 export default function Reports() {
     const [reportType, setReportType] = useState('sales');
     const [format, setFormat] = useState('excel');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [generating, setGenerating] = useState(false);
+    const [aiGenerating, setAiGenerating] = useState(false);
+    const [monthlyDownloading, setMonthlyDownloading] = useState(false);
+    const [monthlyFormat, setMonthlyFormat] = useState<'pdf' | 'excel'>('pdf');
+    const [aiReport, setAiReport] = useState<AiReportItem[]>([]);
+    const [aiMonth, setAiMonth] = useState<number>(new Date().getMonth() + 1);
+    const [aiYear, setAiYear] = useState<number>(new Date().getFullYear());
 
     const handleGenerate = async () => {
         setGenerating(true);
@@ -40,6 +52,55 @@ export default function Reports() {
             toast.error('Error generating report');
         } finally {
             setGenerating(false);
+        }
+    };
+
+    const handleGenerateAiReport = async () => {
+        setAiGenerating(true);
+        try {
+            const response = await reports.getMonthlyAiReport(aiMonth, aiYear);
+            const data = response?.data?.ai_report;
+            const errorMessage = response?.data?.ai_report_error;
+
+            if (Array.isArray(data) && data.length > 0) {
+                setAiReport(data);
+                toast.success('AI monthly report generated');
+            } else {
+                setAiReport([]);
+                toast.error(errorMessage || 'AI report is unavailable. Check GROQ_API_KEY and data.');
+            }
+        } catch (error) {
+            console.error('Error generating AI monthly report:', error);
+            toast.error('Error generating AI monthly report');
+        } finally {
+            setAiGenerating(false);
+        }
+    };
+
+    const handleDownloadMonthlyBusinessReport = async () => {
+        setMonthlyDownloading(true);
+        try {
+            const response = await reports.downloadMonthlyBusinessReport(aiMonth, aiYear, monthlyFormat);
+            const blob = new Blob([response.data]);
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const monthText = String(aiMonth).padStart(2, '0');
+
+            link.href = url;
+            link.setAttribute(
+                'download',
+                `monthly-business-report-${aiYear}-${monthText}.${monthlyFormat === 'pdf' ? 'pdf' : 'xlsx'}`
+            );
+
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            toast.success('Monthly Business Report downloaded');
+        } catch (error) {
+            console.error('Error downloading Monthly Business Report:', error);
+            toast.error('Failed to download Monthly Business Report');
+        } finally {
+            setMonthlyDownloading(false);
         }
     };
 
@@ -149,6 +210,91 @@ export default function Reports() {
                         {generating ? 'Generating...' : 'Generate Report'}
                     </button>
                 </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-md p-6 max-w-4xl space-y-4">
+                <div>
+                    <h2 className="text-xl font-bold text-gray-800">AI Monthly Report</h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                        One AI call generates an executive summary from monthly CRM data.
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Month</label>
+                        <input
+                            type="number"
+                            min={1}
+                            max={12}
+                            value={aiMonth}
+                            onChange={(e) => setAiMonth(Number(e.target.value) || 1)}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
+                        <input
+                            type="number"
+                            min={2000}
+                            max={2100}
+                            value={aiYear}
+                            onChange={(e) => setAiYear(Number(e.target.value) || new Date().getFullYear())}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        />
+                    </div>
+                    <button
+                        onClick={handleGenerateAiReport}
+                        disabled={aiGenerating}
+                        className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-all disabled:opacity-50"
+                    >
+                        {aiGenerating ? 'Generating AI Report...' : 'Generate AI Monthly Report'}
+                    </button>
+                </div>
+
+                <div className="flex flex-col md:flex-row md:items-center gap-3">
+                    <div className="flex items-center gap-4">
+                        <label className="flex items-center text-sm text-gray-700">
+                            <input
+                                type="radio"
+                                name="monthly-format"
+                                checked={monthlyFormat === 'pdf'}
+                                onChange={() => setMonthlyFormat('pdf')}
+                                className="mr-2"
+                            />
+                            PDF
+                        </label>
+                        <label className="flex items-center text-sm text-gray-700">
+                            <input
+                                type="radio"
+                                name="monthly-format"
+                                checked={monthlyFormat === 'excel'}
+                                onChange={() => setMonthlyFormat('excel')}
+                                className="mr-2"
+                            />
+                            Excel
+                        </label>
+                    </div>
+                    <button
+                        onClick={handleDownloadMonthlyBusinessReport}
+                        disabled={monthlyDownloading}
+                        className="md:ml-auto px-4 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-all disabled:opacity-50"
+                    >
+                        {monthlyDownloading ? 'Downloading...' : 'Download Monthly Business Report'}
+                    </button>
+                </div>
+
+                {aiReport.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                        {aiReport.map((item, index) => (
+                            <div key={`${item.section}-${index}`} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                <p className="text-xs uppercase tracking-wide text-indigo-600 font-semibold mb-1">{item.section}</p>
+                                <h3 className="text-base font-semibold text-gray-800 mb-1">{item.title}</h3>
+                                <p className="text-sm text-gray-600">{item.details}</p>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Report Templates */}
