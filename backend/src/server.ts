@@ -20,6 +20,7 @@ import productsRouter from './routes/products';
 import shopRouter from './routes/shop';
 import couponsRouter from './routes/coupons';
 import chatRouter from './routes/chat';
+import { getGroqClient } from './routes/aihelper';
 
 dotenv.config();
 
@@ -117,6 +118,14 @@ async function startServer() {
             console.log(`🚀 CRM API Server v${VERSION} - Retail Edition`);
             console.log(`🛍️  Phase 3: Customer Purchase Tracking + SMS Campaigns`);
             console.log(`📡 Server running on http://localhost:${PORT}`);
+            
+            // Check AI connection
+            try {
+                getGroqClient();
+                console.log(`🤖 AI (Groq API) ✅ Connected`);
+            } catch (error) {
+                console.error(`🤖 AI (Groq API) ❌ Connection failed:`, error instanceof Error ? error.message : 'Unknown error');
+            }
         });
     } catch (error) {
         console.error('Failed to start server:', error);

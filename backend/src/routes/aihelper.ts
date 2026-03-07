@@ -2,15 +2,22 @@
 
 import Groq from "groq-sdk";
 import dotenv from "dotenv";
+import path from "path";
+
 dotenv.config();
 
 let groqClient: Groq | null = null;
 
-function getGroqClient(): Groq {
+export function getGroqClient(): Groq {
   const apiKey = process.env.GROQ_API_KEY;
 
   if (!apiKey || !apiKey.trim()) {
-    throw new Error("Missing GROQ_API_KEY. Add it to backend/.env to enable AI features.");
+    throw new Error(
+      "Missing GROQ_API_KEY. Please:\n" +
+      "1. Copy backend/.env.example to backend/.env\n" +
+      "2. Add your Groq API key from https://console.groq.com\n" +
+      "3. Set GROQ_API_KEY in backend/.env"
+    );
   }
 
   if (!groqClient) {
