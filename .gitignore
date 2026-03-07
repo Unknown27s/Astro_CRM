@@ -24,6 +24,7 @@ backend/uploads/*
 .env
 .env.local
 .env.*.local
+!backend/.env.example
 
 # Logs
 logs/
