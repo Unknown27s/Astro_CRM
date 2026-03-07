@@ -1,0 +1,33 @@
+{
+  "id": "chatcmpl-8ec0f610-04f5-49ee-9a20-63ca6093d7ac",
+  "object": "chat.completion",
+  "created": 1772894132,
+  "model": "llama-3.3-70b-versatile",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Hello. How can I help you today?"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "queue_time": 0.159674613,
+    "prompt_tokens": 36,
+    "prompt_time": 0.011692926,
+    "completion_tokens": 10,
+    "completion_time": 0.035800383,
+    "total_tokens": 46,
+    "total_time": 0.047493309
+  },
+  "usage_breakdown": null,
+  "system_fingerprint": "fp_3272ea2d91",
+  "x_groq": {
+    "id": "req_01kk4bk5s5f1pvcmf6k8e8nehr",
+    "seed": 1014323666
+  },
+  "service_tier": "on_demand"
+}
