@@ -9,6 +9,7 @@ import {
     ShoppingBag,
     Sparkles,
     FileDown,
+    Cpu,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -30,57 +31,54 @@ export default function Layout({ setAuth }: LayoutProps) {
         { path: '/customers', icon: Users, label: 'Customers' },
         { path: '/campaigns', icon: Send, label: 'Campaigns' },
         { path: '/insights', icon: BarChart3, label: 'Insights' },
-        { path: '/online-store', icon: ShoppingBag, label: 'Online Store' },
         { path: '/analytics', icon: Sparkles, label: 'ML Analytics' },
         { path: '/reports', icon: FileDown, label: 'Reports' },
         { path: '/import', icon: Upload, label: 'Import Data' },
+        { path: '/online-store', icon: ShoppingBag, label: 'Online Store' },
+        { path: '/ai', icon: Cpu, label: 'AI Studio' },
     ];
 
     return (
         <div className="min-h-screen bg-gray-50">
-            {/* Sidebar */}
-            <aside className="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-indigo-900 to-indigo-700 text-white shadow-xl flex flex-col">
-                <div className="p-6">
-                    <h1 className="text-2xl font-bold">Retail CRM</h1>
-                    <p className="text-indigo-200 text-sm mt-1">Purchase & Campaign Tracking</p>
-                </div>
-
-                <nav className="mt-6 flex-1">
-                    {navItems.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = location.pathname === item.path;
-                        return (
-                            <Link
-                                key={item.path}
-                                to={item.path}
-                                className={`flex items-center gap-3 px-6 py-3 transition-all ${isActive
+            <aside className="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-indigo-900 to-indigo-700 text-white shadow-xl flex flex-col justify-between">
+                <div>
+                    <div className="p-6">
+                        <h1 className="text-2xl font-bold">Retail CRM</h1>
+                        <p className="text-indigo-200 text-sm mt-1">Purchase & Campaign Tracking</p>
+                    </div>
+                    <nav className="mt-6 flex-1 overflow-y-auto">
+                        {navItems.map((item) => {
+                            const Icon = item.icon;
+                            const isActive = location.pathname === item.path;
+                            return (
+                                <Link
+                                    key={item.path}
+                                    to={item.path}
+                                    className={`flex items-center gap-3 px-6 py-3 transition-all ${isActive
                                         ? 'bg-white/20 border-l-4 border-white'
                                         : 'hover:bg-white/10'
                                     }`}
-                            >
-                                <Icon size={20} />
-                                <span>{item.label}</span>
-                            </Link>
-                        );
-                    })}
-                </nav>
-
-                <div className="p-4 border-t border-white/10">
-                    <p className="text-xs text-indigo-200 text-center">
-                        v3.0.0 - Retail Edition
-                    </p>
+                                >
+                                    <Icon size={20} />
+                                    <span>{item.label}</span>
+                                </Link>
+                            );
+                        })}
+                    </nav>
                 </div>
-
-                <button
-                    onClick={handleLogout}
-                    className="m-4 flex items-center gap-3 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all"
-                >
-                    <LogOut size={20} />
-                    <span>Logout</span>
-                </button>
+                <div>
+                    <div className="p-4 border-t border-white/10">
+                        <p className="text-xs text-indigo-200 text-center">v3.0.0 - Retail Edition</p>
+                    </div>
+                    <button
+                        onClick={handleLogout}
+                        className="m-4 flex items-center gap-3 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all"
+                    >
+                        <LogOut size={20} />
+                        <span>Logout</span>
+                    </button>
+                </div>
             </aside>
-
-            {/* Main Content */}
             <main className="ml-64 p-8">
                 <Outlet />
             </main>

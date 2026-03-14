@@ -13,6 +13,7 @@ import Shop from './pages/Shop';
 import Analytics from './pages/Analytics';
 import Reports from './pages/Reports';
 import AIAssistant from './components/AIAssistant';
+import AIStudio from './pages/AIStudio';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = React.useState(
@@ -28,24 +29,33 @@ function App() {
         error: { iconTheme: { primary: '#EF4444', secondary: '#fff' } },
       }} />
       <Routes>
-        <Route path="/login" element={<Login setAuth={setIsAuthenticated} />} />
+        <Route
+          path="/login"
+          element={
+            isAuthenticated ? <Navigate to="/" replace /> : <Login setAuth={setIsAuthenticated} />
+          }
+        />
         {/* Public storefront — no auth required */}
         <Route path="/shop" element={<Shop />} />
 
-        {isAuthenticated ? (
-          <Route path="/" element={<Layout setAuth={setIsAuthenticated} />}>
-            <Route index element={<Dashboard />} />
-            <Route path="customers" element={<Customers />} />
-            <Route path="campaigns" element={<Campaigns />} />
-            <Route path="insights" element={<Insights />} />
-            <Route path="import" element={<Import />} />
-            <Route path="online-store" element={<OnlineStore />} />
-            <Route path="analytics" element={<Analytics />} />
-            <Route path="reports" element={<Reports />} />
-          </Route>
-        ) : (
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        )}
+        <Route
+          path="/"
+          element={
+            isAuthenticated ? <Layout setAuth={setIsAuthenticated} /> : <Navigate to="/login" replace />
+          }
+        >
+          <Route index element={<Dashboard />} />
+          <Route path="customers" element={<Customers />} />
+          <Route path="campaigns" element={<Campaigns />} />
+          <Route path="insights" element={<Insights />} />
+          <Route path="import" element={<Import />} />
+          <Route path="online-store" element={<OnlineStore />} />
+          <Route path="analytics" element={<Analytics />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="ai" element={<AIStudio />} />
+        </Route>
+
+        <Route path="*" element={<Navigate to={isAuthenticated ? '/' : '/login'} replace />} />
       </Routes>
       <AIAssistant />
     </BrowserRouter>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { campaigns } from '../services/api';
+import { campaigns, aiService } from '../services/api';
 import toast from 'react-hot-toast';
-import { Send, Plus, MessageCircle, Users, Check } from 'lucide-react';
+import { Send, Plus, MessageCircle, Users, Check, Brain, Loader2 } from 'lucide-react';
 
 export default function Campaigns() {
     const [campaignList, setCampaignList] = useState<any[]>([]);
@@ -9,6 +9,7 @@ export default function Campaigns() {
     const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
     const [preview, setPreview] = useState<any>(null);
     const [loading, setLoading] = useState(false);
+    const [aiGenerating, setAiGenerating] = useState(false);
 
     const [newCampaign, setNewCampaign] = useState({
         name: '',
@@ -99,6 +100,27 @@ export default function Campaigns() {
             message: '{{name}}, it\'s been a while! Visit us this week and get a special surprise gift.'
         }
     ];
+
+    const handleAiGenerate = async () => {
+        setAiGenerating(true);
+        try {
+            const res = await aiService.generateCampaign({
+                audience: getAudienceLabel(newCampaign.target_audience),
+                goal: 'drive repeat purchases and increase loyalty',
+            });
+            const { message, subject } = res.data;
+            setNewCampaign((prev) => ({
+                ...prev,
+                message: message || prev.message,
+                name: prev.name || subject || prev.name,
+            }));
+            toast.success('AI campaign message generated!');
+        } catch {
+            toast.error('AI generation failed. Check your ASI_ONE_API_KEY.');
+        } finally {
+            setAiGenerating(false);
+        }
+    };
 
     const getAudienceLabel = (audience: string) => {
         const labels: Record<string, string> = {
@@ -294,13 +316,24 @@ export default function Campaigns() {
                                         Use {`{{name}}`}, {`{{total_spent}}`}, {`{{location}}`} as placeholders
                                     </span>
                                 </label>
-                                <textarea
-                                    placeholder="Write your message here..."
-                                    value={newCampaign.message}
-                                    onChange={(e) => setNewCampaign({ ...newCampaign, message: e.target.value })}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                                    rows={5}
-                                />
+                                <div className="relative">
+                                    <textarea
+                                        placeholder="Write your message here or use AI Generate..."
+                                        value={newCampaign.message}
+                                        onChange={(e) => setNewCampaign({ ...newCampaign, message: e.target.value })}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                                        rows={5}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleAiGenerate}
+                                        disabled={aiGenerating}
+                                        className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-xs px-3 py-1.5 rounded-lg hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50 transition-all"
+                                    >
+                                        {aiGenerating ? <Loader2 size={12} className="animate-spin" /> : <Brain size={12} />}
+                                        {aiGenerating ? 'Generating...' : 'AI Generate'}
+                                    </button>
+                                </div>
                                 <p className="text-xs text-gray-500 mt-1">
                                     {newCampaign.message.length}/160 characters
                                 </p>

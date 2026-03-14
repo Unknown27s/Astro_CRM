@@ -18,6 +18,21 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
+// Handle expired tokens automatically
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response && error.response.status === 401) {
+            const isAuthEndpoint = error.config?.url?.includes('/auth/');
+            if (!isAuthEndpoint && window.location.pathname !== '/login') {
+                localStorage.removeItem('token');
+                window.location.href = '/login';
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
 // Auth
 export const auth = {
     login: (email: string, password: string) =>
@@ -132,10 +147,28 @@ export const coupons = {
     toggle: (id: number) => api.patch(`/coupons/${id}/toggle`),
 };
 
-// AI Chat
+// AI Chat (legacy — keep for backwards compat)
 export const aiChat = {
     send: (messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>) =>
-        api.post('/chat', { messages }),
+        api.post('/ai/chat', { messages }),
+};
+
+// AI Features (ASI:One powered)
+export const aiService = {
+    chat: (messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>) =>
+        api.post('/ai/chat', { messages }),
+    dashboardSummary: () =>
+        api.post('/ai/dashboard-summary'),
+    explainAnalytics: () =>
+        api.post('/ai/explain-analytics'),
+    generateCampaign: (data: { audience: string; storeName?: string; goal?: string; tone?: string }) =>
+        api.post('/ai/generate-campaign', data),
+    customerRisk: (customerId: number) =>
+        api.post('/ai/customer-risk', { customerId }),
+    salesForecast: () =>
+        api.post('/ai/sales-forecast'),
+    reportSummary: (data?: { month?: number; year?: number }) =>
+        api.post('/ai/report-summary', data || {}),
 };
 
 // Public shop (no auth needed — uses base axios without interceptor)

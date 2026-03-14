@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { analytics } from '../services/api';
+import { analytics, aiService } from '../services/api';
 import toast from 'react-hot-toast';
 import {
     ScatterChart,
@@ -11,7 +11,7 @@ import {
     Legend,
     ResponsiveContainer,
 } from 'recharts';
-import { Sparkles, Users } from 'lucide-react';
+import { Sparkles, Users, Brain, Loader2 } from 'lucide-react';
 
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
 
@@ -21,6 +21,8 @@ export default function Analytics() {
     const [segmentCustomers, setSegmentCustomers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [clustering, setClustering] = useState(false);
+    const [aiExplanation, setAiExplanation] = useState<string>('');
+    const [aiLoading, setAiLoading] = useState(false);
 
     useEffect(() => {
         loadSegments();
@@ -43,6 +45,8 @@ export default function Analytics() {
             await analytics.segmentCustomers(4);
             await loadSegments();
             toast.success('Customer segmentation completed successfully!');
+        // Auto-explain after segmentation
+        await handleExplainSegments();
         } catch (error: any) {
             toast.error(error.response?.data?.error || 'Error performing segmentation');
         } finally {
@@ -57,6 +61,18 @@ export default function Analytics() {
             setSelectedSegment(segmentId);
         } catch (error) {
             console.error('Error loading segment customers:', error);
+        }
+    };
+
+    const handleExplainSegments = async () => {
+        setAiLoading(true);
+        try {
+            const res = await aiService.explainAnalytics();
+            setAiExplanation(res.data?.explanation || 'No explanation generated.');
+        } catch {
+            setAiExplanation('❌ Unable to explain. Check your ASI_ONE_API_KEY.');
+        } finally {
+            setAiLoading(false);
         }
     };
 
@@ -79,14 +95,26 @@ export default function Analytics() {
                         Customer insights powered by K-means clustering
                     </p>
                 </div>
-                <button
-                    onClick={handleSegmentCustomers}
-                    disabled={clustering}
-                    className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50"
-                >
-                    <Sparkles size={20} />
-                    {clustering ? 'Clustering...' : 'Run Segmentation'}
-                </button>
+                <div className="flex items-center gap-2">
+                    {segments.length > 0 && (
+                        <button
+                            onClick={handleExplainSegments}
+                            disabled={aiLoading}
+                            className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all disabled:opacity-50"
+                        >
+                            {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Brain size={16} />}
+                            {aiLoading ? 'Thinking...' : 'AI Explain'}
+                        </button>
+                    )}
+                    <button
+                        onClick={handleSegmentCustomers}
+                        disabled={clustering}
+                        className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50"
+                    >
+                        <Sparkles size={20} />
+                        {clustering ? 'Clustering...' : 'Run Segmentation'}
+                    </button>
+                </div>
             </div>
 
             {segments.length === 0 && !loading ? (
@@ -232,6 +260,22 @@ export default function Analytics() {
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    )}
+
+                    {/* AI Explanation Panel */}
+                    {aiExplanation && (
+                        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 p-6">
+                            <div className="flex items-center gap-2 mb-3">
+                                <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                                    <Brain size={16} className="text-white" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-bold text-gray-800">AI Segment Analysis</h3>
+                                    <p className="text-[10px] text-gray-500">Powered by ASI:One</p>
+                                </div>
+                            </div>
+                            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{aiExplanation}</p>
                         </div>
                     )}
                 </>

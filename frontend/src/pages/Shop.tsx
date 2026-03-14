@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { publicShop } from '../services/api';
 import toast from 'react-hot-toast';
-import { ShoppingCart, Plus, Minus, X, Search, Phone, Mail, ChevronRight, Package, CheckCircle, MapPin, SlidersHorizontal, Tag } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, X, Search, Phone, Mail, ChevronRight, Package, CheckCircle, MapPin, Tag } from 'lucide-react';
 
 interface CartItem { id: number; name: string; price: number; qty: number; image_url?: string; }
 

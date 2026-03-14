@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { customers, purchases, insights } from '../services/api';
+import { customers, purchases, insights, aiService } from '../services/api';
 import {
     LineChart,
     Line,
@@ -10,7 +10,7 @@ import {
     Legend,
     ResponsiveContainer,
 } from 'recharts';
-import { Users, DollarSign, TrendingUp, ShoppingBag, RefreshCw } from 'lucide-react';
+import { Users, DollarSign, TrendingUp, ShoppingBag, RefreshCw, Brain, Sparkles } from 'lucide-react';
 
 const REFRESH_INTERVAL = 60000; // 60 seconds
 
@@ -20,6 +20,8 @@ export default function Dashboard() {
     const [recentPurchases, setRecentPurchases] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+    const [aiSummary, setAiSummary] = useState<string>('');
+    const [aiLoading, setAiLoading] = useState(false);
 
     const loadDashboard = useCallback(async (showLoader = false) => {
         if (showLoader) setLoading(true);
@@ -40,11 +42,24 @@ export default function Dashboard() {
         }
     }, []);
 
+    const loadAiSummary = useCallback(async () => {
+        setAiLoading(true);
+        try {
+            const res = await aiService.dashboardSummary();
+            setAiSummary(res.data?.summary || '');
+        } catch {
+            setAiSummary('AI summary unavailable. Check your ASI_ONE_API_KEY.');
+        } finally {
+            setAiLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         loadDashboard(true);
+        loadAiSummary();
         const interval = setInterval(() => loadDashboard(false), REFRESH_INTERVAL);
         return () => clearInterval(interval);
-    }, [loadDashboard]);
+    }, [loadDashboard, loadAiSummary]);
 
     if (loading) {
         return (
@@ -97,6 +112,38 @@ export default function Dashboard() {
                         <RefreshCw size={16} />
                     </button>
                 </div>
+            </div>
+
+            {/* AI Insights Card */}
+            <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-violet-50 rounded-xl border border-indigo-100 p-5">
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                            <Brain size={16} className="text-white" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-bold text-gray-800">AI Business Insights</h3>
+                            <p className="text-[10px] text-gray-500">Powered by ASI:One</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={loadAiSummary}
+                        disabled={aiLoading}
+                        className="flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors disabled:opacity-50"
+                    >
+                        <Sparkles size={12} />
+                        {aiLoading ? 'Analyzing...' : 'Refresh'}
+                    </button>
+                </div>
+                {aiLoading ? (
+                    <div className="space-y-2">
+                        <div className="h-3 bg-indigo-100 rounded animate-pulse w-full" />
+                        <div className="h-3 bg-indigo-100 rounded animate-pulse w-4/5" />
+                        <div className="h-3 bg-indigo-100 rounded animate-pulse w-3/5" />
+                    </div>
+                ) : (
+                    <p className="text-sm text-gray-700 leading-relaxed">{aiSummary || 'Click Refresh to generate AI insights.'}</p>
+                )}
             </div>
 
             {/* Stats Grid */}

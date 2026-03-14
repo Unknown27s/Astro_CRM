@@ -71,7 +71,7 @@ Keep details concise and practical (2-3 sentences each).
 No markdown, no extra text.
 `;
 
-    const response = await generateInsights(prompt, 3);
+    const response = await generateInsights(prompt);
     const cleaned = cleanJsonMarkdown(response);
     const parsed = JSON.parse(cleaned);
 

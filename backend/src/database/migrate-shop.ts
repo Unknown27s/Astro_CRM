@@ -31,6 +31,7 @@ export async function migrateShop() {
             currency TEXT DEFAULT '₹',
             whatsapp_number TEXT DEFAULT '',
             is_active INTEGER DEFAULT 1,
+            asi_api_key TEXT DEFAULT '',
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     `);
@@ -85,6 +86,10 @@ export async function migrateShop() {
     try {
         execute(`ALTER TABLE online_orders ADD COLUMN discount_amount REAL DEFAULT 0`);
     } catch (_) { /* column already exists */ }
+
+    try {
+        execute(`ALTER TABLE store_settings ADD COLUMN asi_api_key TEXT DEFAULT ''`);
+    } catch (_) {}
 
     console.log('Shop migration complete');
 }

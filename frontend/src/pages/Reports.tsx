@@ -1,13 +1,7 @@
 import { useState } from 'react';
-import { reports } from '../services/api';
 import toast from 'react-hot-toast';
-import { FileDown, Calendar } from 'lucide-react';
-
-type AiReportItem = {
-    section: string;
-    title: string;
-    details: string;
-};
+import { FileDown, Calendar, Brain, Sparkles } from 'lucide-react';
+import { reports, aiService } from '../services/api';
 
 export default function Reports() {
     const [reportType, setReportType] = useState('sales');
@@ -18,7 +12,7 @@ export default function Reports() {
     const [aiGenerating, setAiGenerating] = useState(false);
     const [monthlyDownloading, setMonthlyDownloading] = useState(false);
     const [monthlyFormat, setMonthlyFormat] = useState<'pdf' | 'excel'>('pdf');
-    const [aiReport, setAiReport] = useState<AiReportItem[]>([]);
+    const [aiSummary, setAiSummary] = useState<string>('');
     const [aiMonth, setAiMonth] = useState<number>(new Date().getMonth() + 1);
     const [aiYear, setAiYear] = useState<number>(new Date().getFullYear());
 
@@ -58,20 +52,18 @@ export default function Reports() {
     const handleGenerateAiReport = async () => {
         setAiGenerating(true);
         try {
-            const response = await reports.getMonthlyAiReport(aiMonth, aiYear);
-            const data = response?.data?.ai_report;
-            const errorMessage = response?.data?.ai_report_error;
-
-            if (Array.isArray(data) && data.length > 0) {
-                setAiReport(data);
-                toast.success('AI monthly report generated');
+            const res = await aiService.reportSummary({ month: aiMonth, year: aiYear });
+            const summary = res?.data?.summary;
+            if (summary) {
+                setAiSummary(summary);
+                toast.success('AI report generated!');
             } else {
-                setAiReport([]);
-                toast.error(errorMessage || 'AI report is unavailable. Check GROQ_API_KEY and data.');
+                setAiSummary('');
+                toast.error('No data found for this period.');
             }
         } catch (error) {
-            console.error('Error generating AI monthly report:', error);
-            toast.error('Error generating AI monthly report');
+            console.error('Error generating AI report:', error);
+            toast.error('AI report failed. Check your ASI_ONE_API_KEY.');
         } finally {
             setAiGenerating(false);
         }
@@ -246,9 +238,13 @@ export default function Reports() {
                     <button
                         onClick={handleGenerateAiReport}
                         disabled={aiGenerating}
-                        className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-all disabled:opacity-50"
+                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-2.5 rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50"
                     >
-                        {aiGenerating ? 'Generating AI Report...' : 'Generate AI Monthly Report'}
+                        {aiGenerating ? (
+                            <><Sparkles size={16} className="animate-spin" /> Analyzing with ASI:One...</>
+                        ) : (
+                            <><Brain size={16} /> Generate AI Business Summary</>
+                        )}
                     </button>
                 </div>
 
@@ -284,15 +280,18 @@ export default function Reports() {
                     </button>
                 </div>
 
-                {aiReport.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                        {aiReport.map((item, index) => (
-                            <div key={`${item.section}-${index}`} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                <p className="text-xs uppercase tracking-wide text-indigo-600 font-semibold mb-1">{item.section}</p>
-                                <h3 className="text-base font-semibold text-gray-800 mb-1">{item.title}</h3>
-                                <p className="text-sm text-gray-600">{item.details}</p>
+                {aiSummary && (
+                    <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                                <Brain size={16} className="text-white" />
                             </div>
-                        ))}
+                            <div>
+                                <h3 className="text-sm font-bold text-gray-800">AI Business Summary</h3>
+                                <p className="text-[10px] text-gray-500">Powered by ASI:One</p>
+                            </div>
+                        </div>
+                        <p className="text-sm text-gray-700 leading-relaxed">{aiSummary}</p>
                     </div>
                 )}
             </div>

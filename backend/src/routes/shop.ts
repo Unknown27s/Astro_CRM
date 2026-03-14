@@ -173,14 +173,15 @@ router.put('/settings', (req: Request, res: Response) => {
     try {
         const {
             store_name, store_tagline, primary_color, banner_text,
-            contact_phone, contact_email, currency, whatsapp_number, is_active
+            contact_phone, contact_email, currency, whatsapp_number, is_active,
+            asi_api_key
         } = req.body;
 
         execute(
             `UPDATE store_settings SET
                 store_name=?, store_tagline=?, primary_color=?, banner_text=?,
                 contact_phone=?, contact_email=?, currency=?, whatsapp_number=?,
-                is_active=?, updated_at=CURRENT_TIMESTAMP
+                asi_api_key=?, is_active=?, updated_at=CURRENT_TIMESTAMP
              WHERE id=1`,
             [
                 store_name || 'My Online Store',
@@ -191,6 +192,7 @@ router.put('/settings', (req: Request, res: Response) => {
                 contact_email || '',
                 currency || '₹',
                 whatsapp_number || '',
+                asi_api_key || '',
                 is_active ? 1 : 0
             ]
         );

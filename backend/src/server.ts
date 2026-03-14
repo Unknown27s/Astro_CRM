@@ -20,7 +20,8 @@ import productsRouter from './routes/products';
 import shopRouter from './routes/shop';
 import couponsRouter from './routes/coupons';
 import chatRouter from './routes/chat';
-import { getGroqClient } from './routes/aihelper';
+import aiRouter from './routes/ai';
+import { getAsiClient } from './routes/aihelper';
 
 dotenv.config();
 
@@ -47,10 +48,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.use((req: Request, res: Response, next: NextFunction) => {
     const isPublicRoute =
         req.path.startsWith('/api/auth') ||
-        req.path.startsWith('/api/chat') ||
         req.path === '/api/health' ||
         req.path === '/api/shop/storefront' ||
-        req.path === '/api/shop/order' ||
         req.path === '/api/shop/validate-coupon';
     if (isPublicRoute || req.method === 'OPTIONS') {
         return next();
@@ -88,6 +87,7 @@ app.use('/api/products', productsRouter);
 app.use('/api/shop', shopRouter);
 app.use('/api/coupons', couponsRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/ai', aiRouter);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {
@@ -108,23 +108,23 @@ app.use((req: Request, res: Response) => {
 async function startServer() {
     try {
         await initializeDatabase();
-        
+
         // Run v3.0.0 migration
         console.log('🔄 Running v3.0.0 migration...');
         await migrateToV3();
         await migrateShop();
-        
+
         app.listen(PORT, () => {
             console.log(`🚀 CRM API Server v${VERSION} - Retail Edition`);
             console.log(`🛍️  Phase 3: Customer Purchase Tracking + SMS Campaigns`);
             console.log(`📡 Server running on http://localhost:${PORT}`);
-            
+
             // Check AI connection
             try {
-                getGroqClient();
-                console.log(`🤖 AI (Groq API) ✅ Connected`);
+                getAsiClient();
+                console.log(`🤖 AI (ASI:One) ✅ Connected — Model: meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo`);
             } catch (error) {
-                console.error(`🤖 AI (Groq API) ❌ Connection failed:`, error instanceof Error ? error.message : 'Unknown error');
+                console.error(`🤖 AI (ASI:One) ❌ Connection failed:`, error instanceof Error ? error.message : 'Unknown error');
             }
         });
     } catch (error) {

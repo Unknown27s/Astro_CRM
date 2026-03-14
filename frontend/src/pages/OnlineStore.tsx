@@ -6,7 +6,7 @@ import {
     Package, Settings, ShoppingBag, Share2, Plus, Edit2, Trash2,
     Eye, EyeOff, CheckCircle, XCircle, Copy, ExternalLink,
     ChevronDown, AlertCircle, Store, Tag, Phone, Mail, Palette,
-    ToggleLeft, ToggleRight, TrendingUp, Clock, Ticket, Percent
+    ToggleLeft, ToggleRight, TrendingUp, Ticket, Percent
 } from 'lucide-react';
 
 const TABS = ['Products', 'Coupons', 'Customize', 'Orders', 'Share & Promote'] as const;
@@ -44,6 +44,7 @@ export default function OnlineStore() {
     const [settingsForm, setSettingsForm] = useState<any>({});
     const [savingSettings, setSavingSettings] = useState(false);
     const [settingsSaved, setSettingsSaved] = useState(false);
+    const [showApiKey, setShowApiKey] = useState(false);
 
     // Delete confirm
     const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -578,6 +579,30 @@ export default function OnlineStore() {
                                         onChange={e => setSettingsForm((f: any) => ({ ...f, contact_email: e.target.value }))}
                                         className="w-full pl-8 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm" />
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1.5">ASI:One API Key</label>
+                                <div className="relative">
+                                    <input
+                                        type={showApiKey ? 'text' : 'password'}
+                                        autoComplete="new-password"
+                                        value={settingsForm.asi_api_key || ''}
+                                        onChange={e => setSettingsForm((f: any) => ({ ...f, asi_api_key: e.target.value }))}
+                                        placeholder="Paste ASI:One API key"
+                                        className="w-full pr-12 pl-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowApiKey(prev => !prev)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600"
+                                    >
+                                        {showApiKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Stored securely in the CRM database. Leave blank to fall back to the ASI_ONE_API_KEY env var.
+                                </p>
                             </div>
 
                             <div className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-xl">
