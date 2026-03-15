@@ -5,15 +5,15 @@ import { performKMeansClustering, prepareCustomerFeatures } from '../services/ml
 const router = Router();
 
 // Get customer segmentation
-router.get('/segments', (req: Request, res: Response) => {
+router.get('/segments', async (req: Request, res: Response) => {
     try {
-        const segments = query(`
-      SELECT 
+        const segments = await query(`
+      SELECT
         cs.segment_id,
         cs.segment_name,
         COUNT(*) as customer_count,
-        AVG(json_extract(cs.features, '$.total_value')) as avg_value,
-        AVG(json_extract(cs.features, '$.purchase_frequency')) as avg_frequency
+        AVG((cs.features::jsonb->>'total_value')::float) as avg_value,
+        AVG((cs.features::jsonb->>'purchase_frequency')::float) as avg_frequency
       FROM customer_segments cs
       GROUP BY cs.segment_id, cs.segment_name
       ORDER BY cs.segment_id
@@ -26,10 +26,10 @@ router.get('/segments', (req: Request, res: Response) => {
 });
 
 // Get customers in a specific segment
-router.get('/segments/:segmentId/customers', (req: Request, res: Response) => {
+router.get('/segments/:segmentId/customers', async (req: Request, res: Response) => {
     try {
-        const customers = query(`
-      SELECT 
+        const customers = await query(`
+      SELECT
         c.*,
         cs.segment_name,
         cs.features
@@ -51,7 +51,7 @@ router.post('/segment-customers', async (req: Request, res: Response) => {
         const { numClusters = 4 } = req.body;
 
         // Get customer data with purchase metrics
-        const customerData = query(`
+        const customerData = await query(`
       SELECT
         c.id as customer_id,
         c.name,
@@ -61,12 +61,12 @@ router.post('/segment-customers', async (req: Request, res: Response) => {
         COALESCE(SUM(p.total_amount), 0) as total_value,
         COALESCE(AVG(p.total_amount), 0) as avg_order_value,
         COALESCE(MAX(p.purchase_date), c.created_at) as last_purchase_date,
-        julianday('now') - julianday(COALESCE(MAX(p.purchase_date), c.created_at)) as days_since_last_purchase
+        EXTRACT(EPOCH FROM (NOW() - COALESCE(MAX(p.purchase_date), c.created_at))) / 86400 as days_since_last_purchase
       FROM customers c
       LEFT JOIN purchases p ON c.id = p.customer_id
       WHERE c.status IN ('Active', 'VIP')
-      GROUP BY c.id
-      HAVING purchase_count > 0
+      GROUP BY c.id, c.name, c.phone, c.location, c.created_at
+      HAVING COUNT(DISTINCT p.id) > 0
     `);
 
         if (customerData.length < numClusters) {
@@ -85,13 +85,13 @@ router.post('/segment-customers', async (req: Request, res: Response) => {
         const segmentNames = assignSegmentNames(clusters, customerData);
 
         // Save segments to database
-        transaction(() => {
+        await transaction(async (client) => {
             // Clear existing segments
-            execute('DELETE FROM customer_segments');
+            await execute('DELETE FROM customer_segments');
 
             // Insert new segments
-            clusters.forEach((cluster, index) => {
-                cluster.points.forEach((pointIndex: number) => {
+            for (const [index, cluster] of clusters.entries()) {
+                for (const pointIndex of cluster.points) {
                     const customer = customerData[pointIndex];
                     const featureData = {
                         total_value: customer.total_value,
@@ -100,13 +100,13 @@ router.post('/segment-customers', async (req: Request, res: Response) => {
                         days_since_last_purchase: customer.days_since_last_purchase
                     };
 
-                    execute(
+                    await execute(
                         `INSERT INTO customer_segments (customer_id, segment_id, segment_name, features)
              VALUES (?, ?, ?, ?)`,
                         [customer.customer_id, index, segmentNames[index], JSON.stringify(featureData)]
                     );
-                });
-            });
+                }
+            }
         });
 
         res.json({
@@ -124,22 +124,22 @@ router.post('/segment-customers', async (req: Request, res: Response) => {
 });
 
 // Get dashboard analytics
-router.get('/dashboard', (req: Request, res: Response) => {
+router.get('/dashboard', async (req: Request, res: Response) => {
     try {
         const { start_date, end_date } = req.query;
 
         // Total customers
-        const totalCustomers = query(`SELECT COUNT(*) as count FROM customers`)[0];
+        const totalCustomers = (await query(`SELECT COUNT(*) as count FROM customers`))[0];
 
         // Customer stats by status
-        const customerStats = query(`
+        const customerStats = (await query(`
       SELECT
         COUNT(*) as total_customers,
         COUNT(CASE WHEN status = 'Active' THEN 1 END) as active_customers,
         COUNT(CASE WHEN status = 'VIP' THEN 1 END) as vip_customers,
         COUNT(CASE WHEN status = 'Inactive' THEN 1 END) as inactive_customers
       FROM customers
-    `)[0];
+    `))[0];
 
         // Purchase stats
         let purchaseQuery = `
@@ -161,10 +161,10 @@ router.get('/dashboard', (req: Request, res: Response) => {
             params.push(end_date);
         }
 
-        const purchaseStats = query(purchaseQuery, params)[0];
+        const purchaseStats = (await query(purchaseQuery, params))[0];
 
         // Recent purchases with customer info
-        const recentPurchases = query(`
+        const recentPurchases = await query(`
       SELECT p.*, c.name as customer_name, c.phone as customer_phone
       FROM purchases p
       LEFT JOIN customers c ON p.customer_id = c.id
@@ -184,20 +184,20 @@ router.get('/dashboard', (req: Request, res: Response) => {
 });
 
 // Purchase trends over time
-router.get('/trends/sales', (req: Request, res: Response) => {
+router.get('/trends/sales', async (req: Request, res: Response) => {
     try {
         const { period = 'month', limit = '12' } = req.query;
 
         let groupBy = '';
         if (period === 'day') {
-            groupBy = "strftime('%Y-%m-%d', purchase_date)";
+            groupBy = "TO_CHAR(purchase_date, 'YYYY-MM-DD')";
         } else if (period === 'week') {
-            groupBy = "strftime('%Y-W%W', purchase_date)";
+            groupBy = `TO_CHAR(purchase_date, 'IYYY-"W"IW')`;
         } else {
-            groupBy = "strftime('%Y-%m', purchase_date)";
+            groupBy = "TO_CHAR(purchase_date, 'YYYY-MM')";
         }
 
-        const trends = query(`
+        const trends = await query(`
       SELECT
         ${groupBy} as period,
         COUNT(*) as count,

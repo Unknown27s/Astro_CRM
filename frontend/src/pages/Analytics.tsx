@@ -204,13 +204,13 @@ export default function Analytics() {
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-neutral-500">Avg Value:</span>
                                                 <span className="font-semibold text-neutral-900">
-                                                    ₹{(segment.avg_value || 0).toFixed(0)}
+                                                    ₹{Number(segment.avg_value || 0).toFixed(0)}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-neutral-500">Avg Frequency:</span>
                                                 <span className="font-semibold text-neutral-900">
-                                                    {(segment.avg_frequency || 0).toFixed(1)}
+                                                    {Number(segment.avg_frequency || 0).toFixed(1)}
                                                 </span>
                                             </div>
                                         </div>

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { query, queryOne, execute } from '../database/db';
+import { query, queryOne, execute, parseJsonField } from '../database/db';
 
 const router = Router();
 
@@ -7,7 +7,7 @@ const router = Router();
 const syncState: Map<string, any> = new Map();
 
 // Create Google Sheets sync configuration
-router.post('/setup', (req: Request, res: Response) => {
+router.post('/setup', async (req: Request, res: Response) => {
     try {
         const { sheet_id, sheet_name, sync_type, sync_interval = 60 } = req.body;
 
@@ -20,9 +20,14 @@ router.post('/setup', (req: Request, res: Response) => {
         }
 
         const syncId = `${sheet_id}_${sheet_name}`;
-        const result = execute(
-            `INSERT OR REPLACE INTO google_sheets_sync (sheet_id, sheet_name, sync_type, status, last_sync_at, next_sync_at)
-             VALUES (?, ?, ?, 'Active', datetime('now'), datetime('now', '+' || ? || ' seconds'))`,
+        await execute(
+            `INSERT INTO google_sheets_sync (sheet_id, sheet_name, sync_type, status, last_sync_at, next_sync_at)
+             VALUES (?, ?, ?, 'Active', NOW(), NOW() + (? || ' seconds')::interval)
+             ON CONFLICT (sheet_id, sheet_name) DO UPDATE SET
+               sync_type = EXCLUDED.sync_type,
+               status = EXCLUDED.status,
+               last_sync_at = EXCLUDED.last_sync_at,
+               next_sync_at = EXCLUDED.next_sync_at`,
             [sheet_id, sheet_name, sync_type, sync_interval]
         );
 
@@ -39,9 +44,9 @@ router.post('/setup', (req: Request, res: Response) => {
 });
 
 // Get all active syncs
-router.get('/syncs', (req: Request, res: Response) => {
+router.get('/syncs', async (req: Request, res: Response) => {
     try {
-        const syncs = query('SELECT * FROM google_sheets_sync WHERE status = "Active" ORDER BY created_at DESC');
+        const syncs = await query(`SELECT * FROM google_sheets_sync WHERE status = 'Active' ORDER BY created_at DESC`);
         res.json({ syncs });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -49,11 +54,11 @@ router.get('/syncs', (req: Request, res: Response) => {
 });
 
 // Stop sync
-router.post('/stop-sync/:syncId', (req: Request, res: Response) => {
+router.post('/stop-sync/:syncId', async (req: Request, res: Response) => {
     try {
         const { syncId } = req.params;
 
-        execute('UPDATE google_sheets_sync SET status = "Paused" WHERE sheet_id || "_" || sheet_name = ?', [syncId]);
+        await execute(`UPDATE google_sheets_sync SET status = 'Paused' WHERE sheet_id || '_' || sheet_name = ?`, [syncId]);
 
         // Clear sync state
         if (syncState.has(syncId)) {
@@ -68,10 +73,10 @@ router.post('/stop-sync/:syncId', (req: Request, res: Response) => {
 });
 
 // Manual sync trigger
-router.post('/sync-now/:syncId', (req: Request, res: Response) => {
+router.post('/sync-now/:syncId', async (req: Request, res: Response) => {
     try {
         const { syncId } = req.params;
-        const sync = queryOne('SELECT * FROM google_sheets_sync WHERE sheet_id || "_" || sheet_name = ?', [syncId]);
+        const sync = await queryOne(`SELECT * FROM google_sheets_sync WHERE sheet_id || '_' || sheet_name = ?`, [syncId]);
 
         if (!sync) {
             return res.status(404).json({ error: 'Sync configuration not found' });
@@ -90,7 +95,7 @@ router.post('/sync-now/:syncId', (req: Request, res: Response) => {
 });
 
 // Import data from Google Sheets CSV
-router.post('/import-csv', (req: Request, res: Response) => {
+router.post('/import-csv', async (req: Request, res: Response) => {
     try {
         const { csv_data, sync_type, map_fields } = req.body;
 
@@ -117,17 +122,17 @@ router.post('/import-csv', (req: Request, res: Response) => {
         let errors: string[] = [];
 
         if (sync_type === 'customers') {
-            rows.forEach((row: any) => {
+            for (const row of rows) {
                 try {
                     if (row.name && row.phone) {
-                        const existing = queryOne('SELECT id FROM customers WHERE phone = ?', [row.phone]);
+                        const existing = await queryOne('SELECT id FROM customers WHERE phone = ?', [row.phone]);
                         if (existing) {
-                            execute(
-                                'UPDATE customers SET name = ?, email = ?, location = ?, updated_at = datetime("now") WHERE phone = ?',
+                            await execute(
+                                `UPDATE customers SET name = ?, email = ?, location = ?, updated_at = NOW() WHERE phone = ?`,
                                 [row.name, row.email || '', row.location || '', row.phone]
                             );
                         } else {
-                            execute(
+                            await execute(
                                 'INSERT INTO customers (name, phone, email, location) VALUES (?, ?, ?, ?)',
                                 [row.name, row.phone, row.email || '', row.location || '']
                             );
@@ -137,21 +142,21 @@ router.post('/import-csv', (req: Request, res: Response) => {
                 } catch (error: any) {
                     errors.push(`Row error: ${error.message}`);
                 }
-            });
+            }
         } else if (sync_type === 'products') {
-            rows.forEach((row: any) => {
+            for (const row of rows) {
                 try {
                     if (row.name && row.selling_price) {
-                        const existing = queryOne('SELECT id FROM products WHERE barcode = ?', [row.barcode]);
+                        const existing = await queryOne('SELECT id FROM products WHERE barcode = ?', [row.barcode]);
                         if (existing) {
-                            execute(
+                            await execute(
                                 `UPDATE products
-                                 SET name = ?, category = ?, selling_price = ?, current_stock = COALESCE(?, current_stock), updated_at = datetime("now")
+                                 SET name = ?, category = ?, selling_price = ?, current_stock = COALESCE(?, current_stock), updated_at = NOW()
                                  WHERE barcode = ?`,
                                 [row.name, row.category || '', row.selling_price, row.current_stock, row.barcode]
                             );
                         } else {
-                            execute(
+                            await execute(
                                 `INSERT INTO products (name, sku, barcode, category, selling_price, current_stock, min_stock_level, max_stock_level)
                                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
                                 [
@@ -171,7 +176,7 @@ router.post('/import-csv', (req: Request, res: Response) => {
                 } catch (error: any) {
                     errors.push(`Row error: ${error.message}`);
                 }
-            });
+            }
         }
 
         res.json({
@@ -186,9 +191,9 @@ router.post('/import-csv', (req: Request, res: Response) => {
 });
 
 // Export purchases with customer spending details for Google Sheets
-router.get('/export/purchases', (req: Request, res: Response) => {
+router.get('/export/purchases', async (req: Request, res: Response) => {
     try {
-        const purchases = query(`
+        const purchases = await query(`
             SELECT
                 p.id,
                 c.name as customer_name,
@@ -208,7 +213,7 @@ router.get('/export/purchases', (req: Request, res: Response) => {
 
         // Format for Google Sheets
         const formatted = purchases.map((p: any) => {
-            const items = JSON.parse(p.items || '[]');
+            const items = parseJsonField(p.items);
             const itemList = items.map((i: any) => `${i.name} (${i.qty})`).join('; ');
 
             return {
@@ -237,9 +242,9 @@ router.get('/export/purchases', (req: Request, res: Response) => {
 });
 
 // Export customer spending breakdown for Google Sheets
-router.get('/export/customer-spending', (req: Request, res: Response) => {
+router.get('/export/customer-spending', async (req: Request, res: Response) => {
     try {
-        const customers = query(`
+        const customers = await query(`
             SELECT
                 c.id,
                 c.name,
@@ -258,9 +263,10 @@ router.get('/export/customer-spending', (req: Request, res: Response) => {
         `);
 
         // Get product breakdown per customer
-        const formatted = customers.map((c: any) => {
+        const formatted: any[] = [];
+        for (const c of customers) {
             // Get top products bought by this customer
-            const purchases = query(`
+            const purchases = await query(`
                 SELECT p.items FROM purchases p
                 WHERE p.customer_id = ?
                 ORDER BY p.purchase_date DESC
@@ -269,7 +275,7 @@ router.get('/export/customer-spending', (req: Request, res: Response) => {
 
             const productMap: any = {};
             purchases.forEach((p: any) => {
-                const items = JSON.parse(p.items || '[]');
+                const items = parseJsonField(p.items);
                 items.forEach((item: any) => {
                     if (!productMap[item.name]) {
                         productMap[item.name] = { qty: 0, total: 0 };
@@ -285,7 +291,7 @@ router.get('/export/customer-spending', (req: Request, res: Response) => {
                 .map(([name, data]: any) => `${name} (${data.qty}x, ₹${data.total})`)
                 .join('; ');
 
-            return {
+            formatted.push({
                 customer_name: c.name,
                 customer_phone: c.phone,
                 customer_email: c.email,
@@ -297,8 +303,8 @@ router.get('/export/customer-spending', (req: Request, res: Response) => {
                 last_purchase: c.last_purchase_date,
                 status: c.status,
                 top_products: topProducts,
-            };
-        });
+            });
+        }
 
         res.json({
             customers: formatted,
@@ -312,29 +318,29 @@ router.get('/export/customer-spending', (req: Request, res: Response) => {
 });
 
 // Sync purchases to Google Sheets (mark stock as used)
-router.post('/sync-purchases', (req: Request, res: Response) => {
+router.post('/sync-purchases', async (req: Request, res: Response) => {
     try {
-        const purchases = query(`
+        const purchases = await query(`
             SELECT p.id, p.items FROM purchases p
-            WHERE p.created_at > datetime('now', '-1 hour')
+            WHERE p.created_at > NOW() - INTERVAL '1 hour'
             ORDER BY p.created_at DESC
         `);
 
         let stockUpdated = 0;
-        purchases.forEach((p: any) => {
-            const items = JSON.parse(p.items || '[]');
-            items.forEach((item: any) => {
+        for (const p of purchases) {
+            const items = parseJsonField((p as any).items);
+            for (const item of items) {
                 // Find product by name and reduce stock
-                const product = queryOne('SELECT id FROM products WHERE name = ? LIMIT 1', [item.name]);
+                const product = await queryOne('SELECT id FROM products WHERE name = ? LIMIT 1', [item.name]);
                 if (product) {
-                    execute(
+                    await execute(
                         'UPDATE products SET current_stock = current_stock - ? WHERE id = ?',
                         [item.qty, (product as any).id]
                     );
                     stockUpdated++;
                 }
-            });
-        });
+            }
+        }
 
         res.json({
             message: 'Purchase sync completed',
@@ -392,9 +398,9 @@ router.get('/format/purchases', (req: Request, res: Response) => {
 });
 
 // Get sync stats
-router.get('/stats', (req: Request, res: Response) => {
+router.get('/stats', async (req: Request, res: Response) => {
     try {
-        const stats = query(`
+        const stats = await query(`
             SELECT
                 sync_type,
                 COUNT(*) as total_syncs,
@@ -423,16 +429,16 @@ function scheduleSync(syncId: string, sheetId: string, sheetName: string, syncTy
 }
 
 // Helper function to perform sync (placeholder)
-function performSync(syncId: string, sheetId: string, sheetName: string, syncType: string) {
+async function performSync(syncId: string, sheetId: string, sheetName: string, syncType: string) {
     try {
         // In production, fetch from Google Sheets API here
         // Update sync timestamp
-        execute(
-            'UPDATE google_sheets_sync SET last_sync_at = datetime("now"), next_sync_at = datetime("now", "+60 seconds") WHERE sheet_id = ? AND sheet_name = ?',
+        await execute(
+            `UPDATE google_sheets_sync SET last_sync_at = NOW(), next_sync_at = NOW() + INTERVAL '60 seconds' WHERE sheet_id = ? AND sheet_name = ?`,
             [sheetId, sheetName]
         );
 
-        console.log(`✓ Synced ${syncType} from ${sheetName}`);
+        console.log(`Synced ${syncType} from ${sheetName}`);
     } catch (error) {
         console.error(`Error syncing ${sheetName}:`, error);
     }

@@ -189,7 +189,8 @@ router.post('/execute', upload.single('file'), async (req: Request, res: Respons
         let errors: any[] = [];
 
         if (importType === 'customers') {
-            data.forEach((row, index) => {
+            for (let index = 0; index < data.length; index++) {
+                const row = data[index];
                 try {
                     const mappedData: any = {};
                     Object.keys(mapping).forEach(key => {
@@ -208,14 +209,14 @@ router.post('/execute', upload.single('file'), async (req: Request, res: Respons
                     let isDuplicate = false;
 
                     if (mappedData.phone) {
-                        const existingByPhone = queryOne('SELECT id FROM customers WHERE phone = ?', [mappedData.phone]);
+                        const existingByPhone = await queryOne('SELECT id FROM customers WHERE phone = ?', [mappedData.phone]);
                         if (existingByPhone) {
                             isDuplicate = true;
                         }
                     }
 
                     if (!isDuplicate && mappedData.email) {
-                        const existingByEmail = queryOne('SELECT id FROM customers WHERE email = ?', [mappedData.email]);
+                        const existingByEmail = await queryOne('SELECT id FROM customers WHERE email = ?', [mappedData.email]);
                         if (existingByEmail) {
                             isDuplicate = true;
                         }
@@ -223,10 +224,10 @@ router.post('/execute', upload.single('file'), async (req: Request, res: Respons
 
                     if (isDuplicate) {
                         skipped++;
-                        return; // Skip this row
+                        continue; // Skip this row
                     }
 
-                    execute(
+                    await execute(
                         `INSERT INTO customers (
                 name, phone, email, location, notes, status
               ) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -243,10 +244,11 @@ router.post('/execute', upload.single('file'), async (req: Request, res: Respons
                 } catch (err: any) {
                     errors.push({ row: index + 1, error: err.message });
                 }
-            });
+            }
         } else if (importType === 'products') {
             // Handle product import with stock updates
-            data.forEach((row, index) => {
+            for (let index = 0; index < data.length; index++) {
+                const row = data[index];
                 try {
                     const mappedData: any = {};
                     Object.keys(mapping).forEach(key => {
@@ -265,17 +267,17 @@ router.post('/execute', upload.single('file'), async (req: Request, res: Respons
                     }
 
                     // Check if product exists by SKU or barcode
-                    let existingProduct = null;
+                    let existingProduct: any = null;
                     if (mappedData.sku) {
-                        existingProduct = queryOne('SELECT id FROM products WHERE sku = ?', [mappedData.sku]);
+                        existingProduct = await queryOne('SELECT id FROM products WHERE sku = ?', [mappedData.sku]);
                     }
                     if (!existingProduct && mappedData.barcode) {
-                        existingProduct = queryOne('SELECT id FROM products WHERE barcode = ?', [mappedData.barcode]);
+                        existingProduct = await queryOne('SELECT id FROM products WHERE barcode = ?', [mappedData.barcode]);
                     }
 
                     if (existingProduct) {
                         // Update existing product
-                        execute(
+                        await execute(
                             `UPDATE products SET
                                 name = ?,
                                 category = ?,
@@ -304,7 +306,7 @@ router.post('/execute', upload.single('file'), async (req: Request, res: Respons
                         skipped++;
                     } else {
                         // Create new product
-                        execute(
+                        await execute(
                             `INSERT INTO products (
                                 name, sku, barcode, category, description,
                                 selling_price, cost_price, current_stock,
@@ -330,7 +332,7 @@ router.post('/execute', upload.single('file'), async (req: Request, res: Respons
                 } catch (err: any) {
                     errors.push({ row: index + 1, error: err.message });
                 }
-            });
+            }
         }
 
         res.json({

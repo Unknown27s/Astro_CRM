@@ -1,12 +1,12 @@
 import { Router, Request, Response } from 'express';
-import { query, queryOne, execute, transaction } from '../database/db';
+import { query, queryOne, execute, transaction, parseJsonField } from '../database/db';
 
 const router = Router();
 
 // Get all campaigns
-router.get('/', (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
     try {
-        const campaigns = query(
+        const campaigns = await query(
             'SELECT * FROM campaigns ORDER BY created_at DESC'
         );
         res.json({ campaigns });
@@ -16,15 +16,15 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // Get single campaign with sends
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', async (req: Request, res: Response) => {
     try {
-        const campaign = queryOne('SELECT * FROM campaigns WHERE id = ?', [req.params.id]);
+        const campaign = await queryOne('SELECT * FROM campaigns WHERE id = ?', [req.params.id]);
 
         if (!campaign) {
             return res.status(404).json({ error: 'Campaign not found' });
         }
 
-        const sends = query(
+        const sends = await query(
             `SELECT cs.*, c.name as customer_name
              FROM campaign_sends cs
              LEFT JOIN customers c ON cs.customer_id = c.id
@@ -40,9 +40,9 @@ router.get('/:id', (req: Request, res: Response) => {
 });
 
 // Get campaign sends
-router.get('/:id/sends', (req: Request, res: Response) => {
+router.get('/:id/sends', async (req: Request, res: Response) => {
     try {
-        const sends = query(
+        const sends = await query(
             `SELECT cs.*, c.name as customer_name
              FROM campaign_sends cs
              LEFT JOIN customers c ON cs.customer_id = c.id
@@ -58,7 +58,7 @@ router.get('/:id/sends', (req: Request, res: Response) => {
 });
 
 // Create campaign
-router.post('/', (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response) => {
     try {
         const { name, message, email_subject, campaign_type = 'SMS', target_audience, audience_filter } = req.body;
 
@@ -84,13 +84,13 @@ router.post('/', (req: Request, res: Response) => {
 
         const filterJson = audience_filter ? JSON.stringify(audience_filter) : null;
 
-        const result = execute(
+        const result = await execute(
             `INSERT INTO campaigns (name, message, email_subject, campaign_type, target_audience, audience_filter, status)
              VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [name, message, email_subject || null, campaign_type, target_audience, filterJson, 'Draft']
         );
 
-        const campaign = queryOne('SELECT * FROM campaigns WHERE id = ?', [result.lastInsertRowid]);
+        const campaign = await queryOne('SELECT * FROM campaigns WHERE id = ?', [result.lastInsertRowid]);
         res.status(201).json(campaign);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -98,16 +98,16 @@ router.post('/', (req: Request, res: Response) => {
 });
 
 // Preview campaign audience
-router.post('/:id/preview', (req: Request, res: Response) => {
+router.post('/:id/preview', async (req: Request, res: Response) => {
     try {
-        const campaign = queryOne('SELECT * FROM campaigns WHERE id = ?', [req.params.id]);
+        const campaign = await queryOne('SELECT * FROM campaigns WHERE id = ?', [req.params.id]);
 
         if (!campaign) {
             return res.status(404).json({ error: 'Campaign not found' });
         }
 
         const { target_audience, audience_filter } = campaign as any;
-        const recipients = getAudienceCustomers(target_audience, audience_filter);
+        const recipients = await getAudienceCustomers(target_audience, audience_filter);
 
         res.json({
             count: recipients.length,
@@ -120,9 +120,9 @@ router.post('/:id/preview', (req: Request, res: Response) => {
 });
 
 // Send campaign
-router.post('/:id/send', (req: Request, res: Response) => {
+router.post('/:id/send', async (req: Request, res: Response) => {
     try {
-        const campaign = queryOne('SELECT * FROM campaigns WHERE id = ?', [req.params.id]);
+        const campaign = await queryOne('SELECT * FROM campaigns WHERE id = ?', [req.params.id]);
 
         if (!campaign) {
             return res.status(404).json({ error: 'Campaign not found' });
@@ -133,20 +133,20 @@ router.post('/:id/send', (req: Request, res: Response) => {
         }
 
         const { target_audience, audience_filter, message, email_subject, campaign_type = 'SMS' } = campaign as any;
-        const recipients = getAudienceCustomers(target_audience, audience_filter);
+        const recipients = await getAudienceCustomers(target_audience, audience_filter);
 
         if (recipients.length === 0) {
             return res.status(400).json({ error: 'No recipients found for this audience' });
         }
 
         let sentCount = 0;
-        transaction(() => {
-            recipients.forEach((customer: any) => {
+        await transaction(async (client) => {
+            for (const customer of recipients) {
                 // Send SMS
                 if ((campaign_type === 'SMS' || campaign_type === 'Both') && customer.phone) {
                     const personalizedMessage = replacePlaceholders(message, customer);
 
-                    execute(
+                    await execute(
                         `INSERT INTO campaign_sends (campaign_id, customer_id, phone, message, campaign_type, status)
                          VALUES (?, ?, ?, ?, ?, ?)`,
                         [req.params.id, customer.id, customer.phone, personalizedMessage, 'SMS', 'Sent']
@@ -158,17 +158,17 @@ router.post('/:id/send', (req: Request, res: Response) => {
                 if ((campaign_type === 'Email' || campaign_type === 'Both') && customer.email) {
                     const personalizedMessage = replacePlaceholders(message, customer);
 
-                    execute(
+                    await execute(
                         `INSERT INTO campaign_sends (campaign_id, customer_id, email, message, campaign_type, status)
                          VALUES (?, ?, ?, ?, ?, ?)`,
                         [req.params.id, customer.id, customer.email, personalizedMessage, 'Email', 'Sent']
                     );
                     sentCount++;
                 }
-            });
+            }
 
             // Update campaign status
-            execute(
+            await execute(
                 `UPDATE campaigns SET status = ?, sent_count = ? WHERE id = ?`,
                 ['Sent', sentCount, req.params.id]
             );
@@ -185,16 +185,16 @@ router.post('/:id/send', (req: Request, res: Response) => {
 });
 
 // Delete campaign
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response) => {
     try {
-        const campaign = queryOne('SELECT * FROM campaigns WHERE id = ?', [req.params.id]);
+        const campaign = await queryOne('SELECT * FROM campaigns WHERE id = ?', [req.params.id]);
         if (!campaign) {
             return res.status(404).json({ error: 'Campaign not found' });
         }
 
-        transaction(() => {
-            execute('DELETE FROM campaign_sends WHERE campaign_id = ?', [req.params.id]);
-            execute('DELETE FROM campaigns WHERE id = ?', [req.params.id]);
+        await transaction(async (client) => {
+            await execute('DELETE FROM campaign_sends WHERE campaign_id = ?', [req.params.id]);
+            await execute('DELETE FROM campaigns WHERE id = ?', [req.params.id]);
         });
 
         res.json({ message: 'Campaign deleted successfully' });
@@ -204,17 +204,17 @@ router.delete('/:id', (req: Request, res: Response) => {
 });
 
 // Helper: Get customers based on audience criteria
-function getAudienceCustomers(targetAudience: string, audienceFilterJson: string | null): any[] {
+async function getAudienceCustomers(targetAudience: string, audienceFilterJson: string | null): Promise<any[]> {
     let sql = 'SELECT * FROM customers WHERE 1=1';
     const params: any[] = [];
 
-    const filter = audienceFilterJson ? JSON.parse(audienceFilterJson) : {};
+    const filter = parseJsonField(audienceFilterJson, {});
 
     switch (targetAudience) {
         case 'inactive':
             // Customers with no purchase in X days (default 60)
             const daysInactive = filter.days_since_purchase || 60;
-            sql += ` AND (last_purchase_date IS NULL OR julianday('now') - julianday(last_purchase_date) > ?)`;
+            sql += ` AND (last_purchase_date IS NULL OR EXTRACT(EPOCH FROM (NOW() - last_purchase_date)) / 86400 > ?)`;
             params.push(daysInactive);
             break;
 
@@ -270,7 +270,7 @@ function getAudienceCustomers(targetAudience: string, audienceFilterJson: string
     // Only customers with phone numbers
     sql += ` AND phone IS NOT NULL AND phone != ''`;
 
-    return query(sql, params);
+    return await query(sql, params);
 }
 
 // Helper: Replace placeholders in message

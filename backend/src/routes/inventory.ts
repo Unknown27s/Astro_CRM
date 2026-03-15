@@ -4,7 +4,7 @@ import { query, queryOne, execute } from '../database/db';
 const router = Router();
 
 // Get all products with current stock
-router.get('/products', (req: Request, res: Response) => {
+router.get('/products', async (req: Request, res: Response) => {
     try {
         const { category, low_stock, search } = req.query;
 
@@ -31,7 +31,7 @@ router.get('/products', (req: Request, res: Response) => {
 
         sql += ' ORDER BY current_stock ASC, name ASC';
 
-        const products = query(sql, params);
+        const products = await query(sql, params);
         res.json({ products });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -39,9 +39,9 @@ router.get('/products', (req: Request, res: Response) => {
 });
 
 // Get single product by barcode
-router.get('/products/barcode/:barcode', (req: Request, res: Response) => {
+router.get('/products/barcode/:barcode', async (req: Request, res: Response) => {
     try {
-        const product = queryOne('SELECT * FROM products WHERE barcode = ?', [req.params.barcode]);
+        const product = await queryOne('SELECT * FROM products WHERE barcode = ?', [req.params.barcode]);
         if (!product) {
             return res.status(404).json({ error: 'Product not found' });
         }
@@ -52,7 +52,7 @@ router.get('/products/barcode/:barcode', (req: Request, res: Response) => {
 });
 
 // Add new product
-router.post('/products', (req: Request, res: Response) => {
+router.post('/products', async (req: Request, res: Response) => {
     try {
         const { name, sku, barcode, category, description, cost_price, selling_price, min_stock_level, max_stock_level, supplier, current_stock } = req.body;
 
@@ -61,19 +61,19 @@ router.post('/products', (req: Request, res: Response) => {
         }
 
         if (barcode) {
-            const existing = queryOne('SELECT id FROM products WHERE barcode = ?', [barcode]);
+            const existing = await queryOne('SELECT id FROM products WHERE barcode = ?', [barcode]);
             if (existing) {
                 return res.status(409).json({ error: 'Barcode already exists' });
             }
         }
 
-        const result = execute(
+        const result = await execute(
             `INSERT INTO products (name, sku, barcode, category, description, cost_price, selling_price, min_stock_level, max_stock_level, supplier, current_stock)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [name, sku, barcode, category, description, cost_price, selling_price, min_stock_level || 10, max_stock_level || 100, supplier, current_stock || 0]
         );
 
-        const product = queryOne('SELECT * FROM products WHERE id = ?', [result.lastInsertRowid]);
+        const product = await queryOne('SELECT * FROM products WHERE id = ?', [result.lastInsertRowid]);
         res.status(201).json(product);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -81,16 +81,16 @@ router.post('/products', (req: Request, res: Response) => {
 });
 
 // Update product stock
-router.put('/products/:id', (req: Request, res: Response) => {
+router.put('/products/:id', async (req: Request, res: Response) => {
     try {
         const { name, category, description, cost_price, selling_price, min_stock_level, max_stock_level, supplier } = req.body;
 
-        const product = queryOne('SELECT * FROM products WHERE id = ?', [req.params.id]);
+        const product = await queryOne('SELECT * FROM products WHERE id = ?', [req.params.id]);
         if (!product) {
             return res.status(404).json({ error: 'Product not found' });
         }
 
-        execute(
+        await execute(
             `UPDATE products
              SET name = COALESCE(?, name),
                  category = COALESCE(?, category),
@@ -100,12 +100,12 @@ router.put('/products/:id', (req: Request, res: Response) => {
                  min_stock_level = COALESCE(?, min_stock_level),
                  max_stock_level = COALESCE(?, max_stock_level),
                  supplier = COALESCE(?, supplier),
-                 updated_at = datetime('now')
+                 updated_at = NOW()
              WHERE id = ?`,
             [name, category, description, cost_price, selling_price, min_stock_level, max_stock_level, supplier, req.params.id]
         );
 
-        const updated = queryOne('SELECT * FROM products WHERE id = ?', [req.params.id]);
+        const updated = await queryOne('SELECT * FROM products WHERE id = ?', [req.params.id]);
         res.json(updated);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -113,7 +113,7 @@ router.put('/products/:id', (req: Request, res: Response) => {
 });
 
 // Record barcode scan (stock adjustment)
-router.post('/scan-barcode', (req: Request, res: Response) => {
+router.post('/scan-barcode', async (req: Request, res: Response) => {
     try {
         const { barcode, quantity, transaction_type, reason, notes } = req.body;
 
@@ -121,7 +121,7 @@ router.post('/scan-barcode', (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Barcode and quantity are required' });
         }
 
-        const product = queryOne('SELECT * FROM products WHERE barcode = ?', [barcode]);
+        const product = await queryOne('SELECT * FROM products WHERE barcode = ?', [barcode]);
         if (!product) {
             return res.status(404).json({ error: 'Product not found' });
         }
@@ -134,18 +134,18 @@ router.post('/scan-barcode', (req: Request, res: Response) => {
         }
 
         // Update product stock
-        execute('UPDATE products SET current_stock = ?, last_restock_date = datetime("now"), updated_at = datetime("now") WHERE id = ?', [newQuantity, (product as any).id]);
+        await execute('UPDATE products SET current_stock = ?, last_restock_date = NOW(), updated_at = NOW() WHERE id = ?', [newQuantity, (product as any).id]);
 
         // Log transaction
-        const result = execute(
+        const result = await execute(
             `INSERT INTO inventory_transactions (product_id, transaction_type, quantity_change, previous_quantity, new_quantity, reason, barcode_scanned, notes)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [(product as any).id, transaction_type || 'adjustment', quantityChange, (product as any).current_stock, newQuantity, reason, barcode, notes]
         );
 
-        const transaction = queryOne('SELECT * FROM inventory_transactions WHERE id = ?', [result.lastInsertRowid]);
+        const txn = await queryOne('SELECT * FROM inventory_transactions WHERE id = ?', [result.lastInsertRowid]);
         res.status(201).json({
-            transaction,
+            transaction: txn,
             product: { id: (product as any).id, name: (product as any).name, current_stock: newQuantity }
         });
     } catch (error: any) {
@@ -154,7 +154,7 @@ router.post('/scan-barcode', (req: Request, res: Response) => {
 });
 
 // Get inventory transaction history
-router.get('/transactions', (req: Request, res: Response) => {
+router.get('/transactions', async (req: Request, res: Response) => {
     try {
         const { product_id, type, limit = '50' } = req.query;
 
@@ -179,7 +179,7 @@ router.get('/transactions', (req: Request, res: Response) => {
         sql += ' ORDER BY t.created_at DESC LIMIT ?';
         params.push(Math.min(Number(limit) || 50, 500));
 
-        const transactions = query(sql, params);
+        const transactions = await query(sql, params);
         res.json({ transactions });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -187,9 +187,9 @@ router.get('/transactions', (req: Request, res: Response) => {
 });
 
 // Get low stock products
-router.get('/low-stock', (req: Request, res: Response) => {
+router.get('/low-stock', async (req: Request, res: Response) => {
     try {
-        const products = query(
+        const products = await query(
             `SELECT * FROM products
              WHERE current_stock <= min_stock_level
              ORDER BY current_stock ASC`
@@ -201,12 +201,12 @@ router.get('/low-stock', (req: Request, res: Response) => {
 });
 
 // Get inventory dashboard stats
-router.get('/dashboard-stats', (req: Request, res: Response) => {
+router.get('/dashboard-stats', async (req: Request, res: Response) => {
     try {
-        const totalProducts = queryOne('SELECT COUNT(*) as count FROM products');
-        const lowStockProducts = queryOne('SELECT COUNT(*) as count FROM products WHERE current_stock <= min_stock_level');
-        const totalStockValue = queryOne('SELECT SUM(current_stock * selling_price) as value FROM products');
-        const recentTransactions = query(
+        const totalProducts = await queryOne('SELECT COUNT(*) as count FROM products');
+        const lowStockProducts = await queryOne('SELECT COUNT(*) as count FROM products WHERE current_stock <= min_stock_level');
+        const totalStockValue = await queryOne('SELECT SUM(current_stock * selling_price) as value FROM products');
+        const recentTransactions = await query(
             `SELECT * FROM inventory_transactions
              ORDER BY created_at DESC LIMIT 5`
         );

@@ -228,7 +228,7 @@ export default function Customers() {
             return;
         }
 
-        const totalAmount = validItems.reduce((sum, item) => sum + item.qty * item.price, 0);
+        const totalAmount = validItems.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.price || 0), 0);
 
         setLoading(true);
         try {
@@ -408,7 +408,7 @@ export default function Customers() {
                                                 </div>
                                                 <p className="text-xs text-neutral-500 truncate">{customer.email || customer.phone}</p>
                                                 <div className="text-sm font-medium text-success-600 mt-1">
-                                                    ₹{customer.total_spent?.toFixed(0) || '0'}
+                                                    ₹{Number(customer.total_spent || 0).toFixed(0)}
                                                 </div>
                                             </button>
                                             {!selectedForDelete.has(customer.id) && (
@@ -552,7 +552,7 @@ export default function Customers() {
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <p className="text-xs text-neutral-600">Total Spent</p>
-                                                <p className="text-2xl font-bold text-primary-600">₹{selectedCustomer.total_spent?.toFixed(0) || '0'}</p>
+                                                <p className="text-2xl font-bold text-primary-600">₹{Number(selectedCustomer.total_spent || 0).toFixed(0)}</p>
                                             </div>
                                             <div>
                                                 <p className="text-xs text-neutral-600">Last Purchase</p>
@@ -570,14 +570,14 @@ export default function Customers() {
                                         <div className="space-y-3 max-h-96 overflow-y-auto">
                                             {customerPurchases.length > 0 ? (
                                                 customerPurchases.map((purchase: any) => {
-                                                    const items = JSON.parse(purchase.items || '[]');
+                                                    const items = Array.isArray(purchase.items) ? purchase.items : (() => { try { return JSON.parse(purchase.items || '[]'); } catch { return []; } })();
                                                     return (
                                                         <div key={purchase.id} className="p-3 bg-gradient-to-br from-neutral-50 to-neutral-100 rounded-lg border border-neutral-200 hover:border-primary-300 transition-all">
                                                             {/* Purchase Header */}
                                                             <div className="flex justify-between items-start gap-2 mb-2">
                                                                 <div>
                                                                     <p className="text-xs text-neutral-500">{purchase.purchase_date}</p>
-                                                                    <p className="font-bold text-success-600 text-sm">Total: ₹{purchase.total_amount.toFixed(2)}</p>
+                                                                    <p className="font-bold text-success-600 text-sm">Total: ₹{Number(purchase.total_amount || 0).toFixed(2)}</p>
                                                                 </div>
                                                                 <Badge variant="secondary" className="text-xs">
                                                                     {purchase.payment_method || 'Cash'}
@@ -589,14 +589,14 @@ export default function Customers() {
                                                                 <div className="mt-2 pt-2 border-t border-neutral-300">
                                                                     <div className="space-y-1 text-xs">
                                                                         {items.map((item: any, idx: number) => {
-                                                                            const lineTotal = item.qty * item.price;
+                                                                            const lineTotal = Number(item.qty || 0) * Number(item.price || 0);
                                                                             return (
                                                                                 <div key={idx} className="flex justify-between items-center gap-2 px-1">
                                                                                     <span className="text-neutral-700 font-medium flex-1">
                                                                                         {item.name} × {item.qty}
                                                                                     </span>
                                                                                     <span className="text-neutral-600">
-                                                                                        ₹{item.price.toFixed(0)}
+                                                                                        ₹{Number(item.price || 0).toFixed(0)}
                                                                                     </span>
                                                                                     <span className="text-neutral-900 font-semibold min-w-[60px] text-right">
                                                                                         ₹{lineTotal.toFixed(2)}
@@ -875,7 +875,7 @@ export default function Customers() {
                                         )}
                                     </div>
                                     <div className="text-xs text-neutral-600 text-right">
-                                        Subtotal: ₹{(item.qty * item.price).toFixed(2)}
+                                        Subtotal: ₹{(Number(item.qty || 0) * Number(item.price || 0)).toFixed(2)}
                                     </div>
                                 </div>
                             ))}
@@ -938,13 +938,13 @@ export default function Customers() {
                     <div className="bg-gradient-to-r from-primary-50 to-primary-100 border border-primary-200 rounded-lg p-4">
                         <div className="flex justify-between items-center mb-2">
                             <span className="text-sm text-neutral-600">Subtotal:</span>
-                            <span className="font-semibold text-neutral-900">₹{newPurchase.items.reduce((sum, item) => sum + item.qty * item.price, 0).toFixed(2)}</span>
+                            <span className="font-semibold text-neutral-900">₹{newPurchase.items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.price || 0), 0).toFixed(2)}</span>
                         </div>
                         <div className="border-t border-primary-300 pt-2">
                             <div className="flex justify-between items-center">
                                 <span className="font-semibold text-neutral-900">Total Amount:</span>
                                 <span className="text-2xl font-bold text-primary-600">
-                                    ₹{newPurchase.items.reduce((sum, item) => sum + item.qty * item.price, 0).toFixed(2)}
+                                    ₹{newPurchase.items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.price || 0), 0).toFixed(2)}
                                 </span>
                             </div>
                         </div>

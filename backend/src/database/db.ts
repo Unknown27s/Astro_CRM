@@ -1,115 +1,117 @@
-import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
+import { Pool, PoolClient, types } from 'pg';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import dotenv from 'dotenv';
 
-const dbPath = join(__dirname, '../../data/crm.db');
-let db: SqlJsDatabase;
-let inTransaction = false;
+dotenv.config();
 
-// Initialize SQL.js
-async function initDb() {
-    const SQL = await initSqlJs();
+// Fix PostgreSQL returning NUMERIC/DECIMAL/BIGINT as strings
+// Parse them as JavaScript numbers so frontend gets proper numbers
+types.setTypeParser(20, parseFloat);   // INT8 (bigint)
+types.setTypeParser(21, parseInt);     // INT2 (smallint)
+types.setTypeParser(23, parseInt);     // INT4 (integer)
+types.setTypeParser(700, parseFloat);  // FLOAT4
+types.setTypeParser(701, parseFloat);  // FLOAT8
+types.setTypeParser(1700, parseFloat); // NUMERIC/DECIMAL
 
-    // Ensure data directory exists
-    const dir = dirname(dbPath);
-    if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true });
-    }
+const pool = new Pool({
+    user: process.env.PG_USER || 'postgres',
+    password: process.env.PG_PASSWORD || 'postgres',
+    host: process.env.PG_HOST || 'localhost',
+    port: parseInt(process.env.PG_PORT || '5432'),
+    database: process.env.PG_DATABASE || 'astrocrm',
+});
 
-    // Load existing database or create new one
-    if (existsSync(dbPath)) {
-        const buffer = readFileSync(dbPath);
-        db = new SQL.Database(buffer);
-    } else {
-        db = new SQL.Database();
-    }
-
-    return db;
-}
-
-// Save database to file
-function saveDatabase() {
-    if (db) {
-        const data = db.export();
-        const buffer = Buffer.from(data);
-        writeFileSync(dbPath, buffer);
-    }
+// Convert SQLite-style ? placeholders to PostgreSQL $1, $2, etc.
+function convertPlaceholders(sql: string): string {
+    let idx = 0;
+    return sql.replace(/\?/g, () => `$${++idx}`);
 }
 
 // Initialize database with schema
 export async function initializeDatabase() {
-    await initDb();
-    const schema = readFileSync(join(__dirname, 'schema.sql'), 'utf-8');
-    // Run each statement individually so one failure doesn't block others
-    const statements = schema.split(';').filter(s => s.trim());
-    for (const stmt of statements) {
-        try {
-            db.run(stmt);
-        } catch (e) {
-            // Ignore errors from IF NOT EXISTS statements on existing tables
+    const client = await pool.connect();
+    try {
+        // Run the PostgreSQL schema
+        const schema = readFileSync(join(__dirname, 'schema-pg.sql'), 'utf-8');
+        await client.query(schema);
+        console.log('Database initialized successfully (PostgreSQL)');
+    } catch (error: any) {
+        // Ignore "already exists" errors
+        if (!error.message?.includes('already exists')) {
+            console.error('Schema initialization warning:', error.message);
         }
+    } finally {
+        client.release();
     }
-    saveDatabase();
-    console.log('Database initialized successfully');
 }
 
 // Generic query helper
-export function query<T = any>(sql: string, params: any[] = []): T[] {
-    const results = db.exec(sql, params);
-    if (results.length === 0) return [];
-
-    const columns = results[0].columns;
-    const values = results[0].values;
-
-    return values.map((row: any[]) => {
-        const obj: any = {};
-        columns.forEach((col: string, idx: number) => {
-            obj[col] = row[idx];
-        });
-        return obj as T;
-    });
+export async function query<T = any>(sql: string, params: any[] = []): Promise<T[]> {
+    const pgSql = convertPlaceholders(sql);
+    const result = await pool.query(pgSql, params);
+    return result.rows as T[];
 }
 
 // Get single row
-export function queryOne<T = any>(sql: string, params: any[] = []): T | undefined {
-    const results = query<T>(sql, params);
+export async function queryOne<T = any>(sql: string, params: any[] = []): Promise<T | undefined> {
+    const results = await query<T>(sql, params);
     return results.length > 0 ? results[0] : undefined;
 }
 
 // Insert/Update/Delete
-export function execute(sql: string, params: any[] = []): { lastInsertRowid: number; changes: number } {
-    db.run(sql, params);
+export async function execute(sql: string, params: any[] = []): Promise<{ lastInsertRowid: number; changes: number }> {
+    const pgSql = convertPlaceholders(sql);
 
-    // Only save to disk if we're not inside a transaction
-    // (the transaction helper will save once at the end)
-    if (!inTransaction) {
-        saveDatabase();
+    // If it's an INSERT, add RETURNING id to get the last insert ID
+    let finalSql = pgSql;
+    const isInsert = pgSql.trim().toUpperCase().startsWith('INSERT');
+    if (isInsert && !pgSql.toUpperCase().includes('RETURNING')) {
+        finalSql = pgSql.replace(/;?\s*$/, ' RETURNING id');
     }
 
-    // Get last insert ID
-    const lastIdResult = db.exec('SELECT last_insert_rowid() as id');
-    const lastInsertRowid = lastIdResult.length > 0 ? Number(lastIdResult[0].values[0][0]) : 0;
+    const result = await pool.query(finalSql, params);
+
+    let lastInsertRowid = 0;
+    if (isInsert && result.rows && result.rows.length > 0) {
+        lastInsertRowid = result.rows[0].id || 0;
+    }
 
     return {
         lastInsertRowid,
-        changes: 1
+        changes: result.rowCount || 0
     };
 }
 
-// Transaction helper (simplified for sql.js)
-export function transaction<T>(callback: () => T): T {
-    db.run('BEGIN TRANSACTION');
-    inTransaction = true;
+// Transaction helper (async)
+export async function transaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
+    const client = await pool.connect();
     try {
-        const result = callback();
-        db.run('COMMIT');
-        saveDatabase();
+        await client.query('BEGIN');
+        const result = await callback(client);
+        await client.query('COMMIT');
         return result;
     } catch (error) {
-        db.run('ROLLBACK');
+        await client.query('ROLLBACK');
         throw error;
     } finally {
-        inTransaction = false;
+        client.release();
     }
 }
 
+// Get the pool for direct access if needed
+export function getPool(): Pool {
+    return pool;
+}
+
+// Graceful shutdown
+export async function closeDatabase() {
+    await pool.end();
+}
+
+// Helper: safely parse JSONB fields (PostgreSQL returns objects, not strings)
+export function parseJsonField(value: any, fallback: any = []): any {
+    if (!value) return fallback;
+    if (typeof value === 'object') return value;
+    try { return JSON.parse(value); } catch { return fallback; }
+}

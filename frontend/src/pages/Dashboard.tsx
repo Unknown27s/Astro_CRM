@@ -237,7 +237,7 @@ export default function Dashboard() {
                                             </div>
                                             <div className="text-right whitespace-nowrap">
                                                 <p className="font-bold text-success-600">
-                                                    ₹{purchase.total_amount.toFixed(2)}
+                                                    ₹{Number(purchase.total_amount || 0).toFixed(2)}
                                                 </p>
                                                 <Badge variant="success" className="text-xs mt-1">
                                                     {purchase.payment_method || 'Cash'}

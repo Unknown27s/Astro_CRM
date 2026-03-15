@@ -4,9 +4,9 @@ import { query, execute } from '../database/db';
 const router = Router();
 
 // GET all products (admin)
-router.get('/', (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
     try {
-        const products = query('SELECT * FROM products ORDER BY created_at DESC');
+        const products = await query('SELECT * FROM products ORDER BY created_at DESC');
         res.json({
             products,
             total: products.length,
@@ -19,9 +19,10 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // GET single product
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', async (req: Request, res: Response) => {
     try {
-        const product = query('SELECT * FROM products WHERE id = ?', [req.params.id])[0];
+        const products = await query('SELECT * FROM products WHERE id = ?', [req.params.id]);
+        const product = products[0];
         if (!product) return res.status(404).json({ error: 'Product not found' });
         res.json({ product });
     } catch (error: any) {
@@ -31,7 +32,7 @@ router.get('/:id', (req: Request, res: Response) => {
 });
 
 // POST create product
-router.post('/', (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response) => {
     try {
         const {
             name, description, price, original_price, selling_price,
@@ -48,7 +49,7 @@ router.post('/', (req: Request, res: Response) => {
         }
 
         try {
-            const result = execute(
+            const result = await execute(
                 `INSERT INTO products (
                     name, description, price, original_price, image_url, category,
                     stock_qty, in_stock, is_visible, sku, barcode, cost_price,
@@ -62,8 +63,8 @@ router.post('/', (req: Request, res: Response) => {
                     image_url || '',
                     category || '',
                     Number(stock_qty) || Number(current_stock) || 0,
-                    in_stock !== false ? 1 : 0,
-                    is_visible !== false ? 1 : 0,
+                    in_stock !== false ? true : false,
+                    is_visible !== false ? true : false,
                     sku || '',
                     barcode || '',
                     cost_price ? Number(cost_price) : null,
@@ -75,7 +76,8 @@ router.post('/', (req: Request, res: Response) => {
                 ]
             );
 
-            const product = query('SELECT * FROM products WHERE id = ?', [result.lastInsertRowid])[0];
+            const products = await query('SELECT * FROM products WHERE id = ?', [result.lastInsertRowid]);
+            const product = products[0];
             res.status(201).json({ product, message: 'Product created successfully' });
         } catch (dbError: any) {
             console.error('Database error creating product:', dbError);
@@ -91,14 +93,14 @@ router.post('/', (req: Request, res: Response) => {
 });
 
 // PUT update product
-router.put('/:id', (req: Request, res: Response) => {
+router.put('/:id', async (req: Request, res: Response) => {
     try {
         const {
             name, description, price, original_price,
             image_url, category, stock_qty, in_stock, is_visible
         } = req.body;
 
-        execute(
+        await execute(
             `UPDATE products SET name=?, description=?, price=?, original_price=?, image_url=?,
              category=?, stock_qty=?, in_stock=?, is_visible=? WHERE id=?`,
             [
@@ -109,13 +111,14 @@ router.put('/:id', (req: Request, res: Response) => {
                 image_url || '',
                 category || '',
                 Number(stock_qty) || 0,
-                in_stock ? 1 : 0,
-                is_visible ? 1 : 0,
+                in_stock ? true : false,
+                is_visible ? true : false,
                 req.params.id
             ]
         );
 
-        const product = query('SELECT * FROM products WHERE id = ?', [req.params.id])[0];
+        const products = await query('SELECT * FROM products WHERE id = ?', [req.params.id]);
+        const product = products[0];
         res.json({ product });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -123,13 +126,14 @@ router.put('/:id', (req: Request, res: Response) => {
 });
 
 // PATCH toggle visibility
-router.patch('/:id/toggle-visibility', (req: Request, res: Response) => {
+router.patch('/:id/toggle-visibility', async (req: Request, res: Response) => {
     try {
-        execute(
-            'UPDATE products SET is_visible = CASE WHEN is_visible = 1 THEN 0 ELSE 1 END WHERE id = ?',
+        await execute(
+            'UPDATE products SET is_visible = NOT is_visible WHERE id = ?',
             [req.params.id]
         );
-        const product = query('SELECT * FROM products WHERE id = ?', [req.params.id])[0];
+        const products = await query('SELECT * FROM products WHERE id = ?', [req.params.id]);
+        const product = products[0];
         res.json({ product });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -137,13 +141,14 @@ router.patch('/:id/toggle-visibility', (req: Request, res: Response) => {
 });
 
 // PATCH toggle stock
-router.patch('/:id/toggle-stock', (req: Request, res: Response) => {
+router.patch('/:id/toggle-stock', async (req: Request, res: Response) => {
     try {
-        execute(
-            'UPDATE products SET in_stock = CASE WHEN in_stock = 1 THEN 0 ELSE 1 END WHERE id = ?',
+        await execute(
+            'UPDATE products SET in_stock = NOT in_stock WHERE id = ?',
             [req.params.id]
         );
-        const product = query('SELECT * FROM products WHERE id = ?', [req.params.id])[0];
+        const products = await query('SELECT * FROM products WHERE id = ?', [req.params.id]);
+        const product = products[0];
         res.json({ product });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -151,9 +156,9 @@ router.patch('/:id/toggle-stock', (req: Request, res: Response) => {
 });
 
 // DELETE product
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response) => {
     try {
-        execute('DELETE FROM products WHERE id = ?', [req.params.id]);
+        await execute('DELETE FROM products WHERE id = ?', [req.params.id]);
         res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

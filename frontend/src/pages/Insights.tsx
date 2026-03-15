@@ -64,7 +64,7 @@ export default function Insights() {
         'July', 'August', 'September', 'October', 'November', 'December'
     ];
 
-    const formatCurrency = (value: number) => `₹${value?.toFixed(0) ?? '0'}`;
+    const formatCurrency = (value: number | string | undefined) => `₹${Number(value || 0).toFixed(0)}`;
 
     const handleFetchMonthlyData = async () => {
         setGeneratingReport(true);
@@ -345,7 +345,7 @@ export default function Insights() {
                                 <div>
                                     <p className="text-sm text-neutral-500 font-medium mb-2">Total Revenue</p>
                                     <p className="text-3xl font-bold text-neutral-900">
-                                        ₹{(revenueTrends.summary.total_revenue || 0).toFixed(0)}
+                                        ₹{Number(revenueTrends.summary.total_revenue || 0).toFixed(0)}
                                     </p>
                                     <div className={`text-sm font-semibold mt-2 ${revenueTrends.summary.growth_percentage >= 0 ? 'text-success-600' : 'text-danger-600'}`}>
                                         {revenueTrends.summary.growth_percentage >= 0 ? '+' : ''}
@@ -400,7 +400,7 @@ export default function Insights() {
                                 <div>
                                     <p className="text-sm text-neutral-500 font-medium mb-2">Avg Transaction</p>
                                     <p className="text-3xl font-bold text-neutral-900">
-                                        ₹{(revenueTrends.summary.avg_transaction || 0).toFixed(0)}
+                                        ₹{Number(revenueTrends.summary.avg_transaction || 0).toFixed(0)}
                                     </p>
                                 </div>
                                 <div className="p-3 rounded-lg bg-warning-50">
@@ -474,7 +474,7 @@ export default function Insights() {
                                         cx="50%"
                                         cy="50%"
                                         labelLine={false}
-                                        label={({ name, percent }: any) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                                        label={({ name, percent }: any) => `${name} ${(Number(percent || 0) * 100).toFixed(0)}%`}
                                         outerRadius={100}
                                         fill="#8884d8"
                                         dataKey="value"
@@ -537,7 +537,7 @@ export default function Insights() {
                                         </div>
                                         <div className="text-right">
                                             <p className="font-semibold text-neutral-900">{item.count} sold</p>
-                                            <p className="text-sm text-neutral-500">₹{item.revenue.toFixed(0)}</p>
+                                            <p className="text-sm text-neutral-500">₹{Number(item.revenue || 0).toFixed(0)}</p>
                                         </div>
                                     </div>
                                 ))}
@@ -603,7 +603,7 @@ export default function Insights() {
                                             <td className="px-4 py-3 text-neutral-600">{customer.phone || '-'}</td>
                                             <td className="px-4 py-3 text-neutral-600">{customer.location || '-'}</td>
                                             <td className="px-4 py-3 text-right font-bold text-success-600">
-                                                ₹{customer.total_spent?.toFixed(2) || '0'}
+                                                ₹{Number(customer.total_spent || 0).toFixed(2)}
                                             </td>
                                             <td className="px-4 py-3 text-right text-neutral-600">{customer.total_purchases || 0}</td>
                                         </tr>
@@ -627,7 +627,7 @@ export default function Insights() {
                                 <div key={method.payment_method} className="bg-neutral-50 rounded-lg p-4 text-center">
                                     <p className="text-2xl font-bold text-primary-600">{method.count}</p>
                                     <p className="text-sm text-neutral-600 mt-1">{method.payment_method}</p>
-                                    <p className="text-xs text-neutral-500 mt-1">₹{method.revenue.toFixed(0)}</p>
+                                    <p className="text-xs text-neutral-500 mt-1">₹{Number(method.revenue || 0).toFixed(0)}</p>
                                 </div>
                             ))}
                         </div>
@@ -690,9 +690,9 @@ function ReportPreview({ reportRef, data, monthName, year, COLORS, formatCurrenc
                 {/* KPI Row in header */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginTop: '32px' }}>
                     {[
-                        { label: 'Total Revenue', value: `₹${(s.total_revenue || 0).toFixed(0)}`, sub: `${s.growth_percentage >= 0 ? '+' : ''}${s.growth_percentage ?? 0}% vs prev month`, color: '#10B981' },
+                        { label: 'Total Revenue', value: `₹${Number(s.total_revenue || 0).toFixed(0)}`, sub: `${s.growth_percentage >= 0 ? '+' : ''}${s.growth_percentage ?? 0}% vs prev month`, color: '#10B981' },
                         { label: 'Total Purchases', value: s.total_purchases || 0, sub: 'transactions', color: '#3b82f6' },
-                        { label: 'Avg Transaction', value: `₹${(s.avg_transaction || 0).toFixed(0)}`, sub: 'per purchase', color: '#f59e0b' },
+                        { label: 'Avg Transaction', value: `₹${Number(s.avg_transaction || 0).toFixed(0)}`, sub: 'per purchase', color: '#f59e0b' },
                         { label: 'New Customers', value: data.new_customers || 0, sub: 'joined this month', color: '#ef4444' },
                     ].map((kpi, i) => (
                         <div key={i} style={{
@@ -755,7 +755,7 @@ function ReportPreview({ reportRef, data, monthName, year, COLORS, formatCurrenc
                                     data={customerDistData.filter(d => d.value > 0)}
                                     cx="50%" cy="50%"
                                     labelLine={false}
-                                    label={({ name, percent }: any) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                                    label={({ name, percent }: any) => `${name} ${(Number(percent || 0) * 100).toFixed(0)}%`}
                                     outerRadius={80}
                                     dataKey="value"
                                 >
@@ -842,7 +842,7 @@ function ReportPreview({ reportRef, data, monthName, year, COLORS, formatCurrenc
                                         {m.payment_method}
                                     </p>
                                     <p style={{ fontSize: '12px', color: '#6B7280', margin: 0 }}>
-                                        ₹{(m.revenue || 0).toFixed(0)}
+                                        ₹{Number(m.revenue || 0).toFixed(0)}
                                     </p>
                                 </div>
                             ))}
@@ -883,7 +883,7 @@ function ReportPreview({ reportRef, data, monthName, year, COLORS, formatCurrenc
                                         <td style={{ padding: '10px 12px', color: '#6B7280' }}>{c.phone || '-'}</td>
                                         <td style={{ padding: '10px 12px', color: '#6B7280' }}>{c.location || '-'}</td>
                                         <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '700', color: '#059669' }}>
-                                            ₹{(c.spent || 0).toFixed(0)}
+                                            ₹{Number(c.spent || 0).toFixed(0)}
                                         </td>
                                         <td style={{ padding: '10px 12px', textAlign: 'right', color: '#6B7280' }}>{c.purchases || 0}</td>
                                     </tr>
@@ -925,7 +925,7 @@ function ReportPreview({ reportRef, data, monthName, year, COLORS, formatCurrenc
                                         <td style={{ padding: '10px 12px', fontWeight: '600', color: '#1F2937' }}>{item.name}</td>
                                         <td style={{ padding: '10px 12px', textAlign: 'right', color: '#0ea5e9', fontWeight: '600' }}>{item.count}</td>
                                         <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '700', color: '#059669' }}>
-                                            ₹{(item.revenue || 0).toFixed(0)}
+                                            ₹{Number(item.revenue || 0).toFixed(0)}
                                         </td>
                                     </tr>
                                 ))}

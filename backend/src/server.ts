@@ -118,17 +118,17 @@ async function startServer() {
         await migrateToV3();
         await migrateShop();
 
-        app.listen(PORT, () => {
+        app.listen(PORT, async () => {
             console.log(`🚀 CRM API Server v${VERSION} - Retail Edition`);
             console.log(`🛍️  Phase 3: Customer Purchase Tracking + SMS Campaigns`);
             console.log(`📡 Server running on http://localhost:${PORT}`);
 
             // Check AI connection
             try {
-                getAsiClient();
+                await getAsiClient();
                 console.log(`🤖 AI (ASI:One) ✅ Connected — Model: meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo`);
             } catch (error) {
-                console.error(`🤖 AI (ASI:One) ❌ Connection failed:`, error instanceof Error ? error.message : 'Unknown error');
+                console.warn(`🤖 AI (ASI:One) ⚠️  Not configured (optional):`, error instanceof Error ? error.message : 'Unknown error. Set ASI_ONE_API_KEY to enable AI features.');
             }
         });
     } catch (error) {

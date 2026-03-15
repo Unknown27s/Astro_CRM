@@ -24,7 +24,7 @@ function validateDealInput(data: any): { valid: boolean; error?: string } {
 }
 
 // Get all deals
-router.get('/', (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
     try {
         const { stage, limit = '100', offset = '0' } = req.query;
 
@@ -48,7 +48,7 @@ router.get('/', (req: Request, res: Response) => {
         sql += ' ORDER BY d.created_at DESC LIMIT ? OFFSET ?';
         params.push(safeLimitNum, safeOffsetNum);
 
-        const deals = query(sql, params);
+        const deals = await query(sql, params);
         res.json({ deals });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -56,17 +56,17 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // Get pipeline summary
-router.get('/stats/pipeline', (req: Request, res: Response) => {
-        try {
-                const stats = query(`
-            SELECT 
+router.get('/stats/pipeline', async (req: Request, res: Response) => {
+    try {
+        const stats = await query(`
+            SELECT
                 stage,
                 COUNT(*) as count,
                 SUM(value) as total_value,
                 AVG(probability) as avg_probability
             FROM deals
             GROUP BY stage
-            ORDER BY 
+            ORDER BY
                 CASE stage
                     WHEN 'Prospecting' THEN 1
                     WHEN 'Qualification' THEN 2
@@ -76,16 +76,16 @@ router.get('/stats/pipeline', (req: Request, res: Response) => {
                     WHEN 'Closed Lost' THEN 6
                 END
         `);
-                res.json(stats);
-        } catch (error: any) {
-                res.status(500).json({ error: error.message });
-        }
+        res.json(stats);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Get single deal
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', async (req: Request, res: Response) => {
     try {
-        const deal = queryOne(`
+        const deal = await queryOne(`
       SELECT d.*, c.first_name, c.last_name, c.company
       FROM deals d
       LEFT JOIN contacts c ON d.contact_id = c.id
@@ -102,7 +102,7 @@ router.get('/:id', (req: Request, res: Response) => {
 });
 
 // Create deal
-router.post('/', (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response) => {
     try {
         const {
             title, contact_id, value, currency, stage, probability,
@@ -114,7 +114,7 @@ router.post('/', (req: Request, res: Response) => {
             return res.status(400).json({ error: validation.error });
         }
 
-        const result = execute(
+        const result = await execute(
             `INSERT INTO deals (
         title, contact_id, value, currency, stage, probability,
         expected_close_date, description
@@ -123,7 +123,7 @@ router.post('/', (req: Request, res: Response) => {
                 stage || 'Prospecting', probability || 0, expected_close_date, description]
         );
 
-        const deal = queryOne('SELECT * FROM deals WHERE id = ?', [result.lastInsertRowid]);
+        const deal = await queryOne('SELECT * FROM deals WHERE id = ?', [result.lastInsertRowid]);
         res.status(201).json(deal);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -131,7 +131,7 @@ router.post('/', (req: Request, res: Response) => {
 });
 
 // Update deal
-router.put('/:id', (req: Request, res: Response) => {
+router.put('/:id', async (req: Request, res: Response) => {
     try {
         const {
             title, contact_id, value, currency, stage, probability,
@@ -143,7 +143,7 @@ router.put('/:id', (req: Request, res: Response) => {
             return res.status(400).json({ error: validation.error });
         }
 
-        execute(
+        await execute(
             `UPDATE deals SET
         title = ?, contact_id = ?, value = ?, currency = ?, stage = ?,
         probability = ?, expected_close_date = ?, description = ?,
@@ -153,7 +153,7 @@ router.put('/:id', (req: Request, res: Response) => {
                 expected_close_date, description, req.params.id]
         );
 
-        const deal = queryOne('SELECT * FROM deals WHERE id = ?', [req.params.id]);
+        const deal = await queryOne('SELECT * FROM deals WHERE id = ?', [req.params.id]);
         res.json(deal);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -161,9 +161,9 @@ router.put('/:id', (req: Request, res: Response) => {
 });
 
 // Delete deal
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response) => {
     try {
-        execute('DELETE FROM deals WHERE id = ?', [req.params.id]);
+        await execute('DELETE FROM deals WHERE id = ?', [req.params.id]);
         res.json({ message: 'Deal deleted successfully' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

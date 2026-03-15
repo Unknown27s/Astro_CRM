@@ -29,7 +29,7 @@ function validateCustomerInput(data: any, isUpdate = false): { valid: boolean; e
 }
 
 // Get all customers
-router.get('/', (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
     try {
         const { search, status, location, limit = '100', offset = '0' } = req.query;
 
@@ -66,8 +66,8 @@ router.get('/', (req: Request, res: Response) => {
         sql += ' ORDER BY last_purchase_date DESC, created_at DESC LIMIT ? OFFSET ?';
         params.push(safeLimitNum, safeOffsetNum);
 
-        const customers = query(sql, params);
-        const totalResult = queryOne(countSql, countParams);
+        const customers = await query(sql, params);
+        const totalResult = await queryOne(countSql, countParams);
         const total = totalResult ? (totalResult as any).count : 0;
 
         res.json({ customers, total });
@@ -77,15 +77,15 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // Get single customer with purchase history
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', async (req: Request, res: Response) => {
     try {
-        const customer = queryOne('SELECT * FROM customers WHERE id = ?', [req.params.id]);
-        
+        const customer = await queryOne('SELECT * FROM customers WHERE id = ?', [req.params.id]);
+
         if (!customer) {
             return res.status(404).json({ error: 'Customer not found' });
         }
 
-        const purchases = query(
+        const purchases = await query(
             'SELECT * FROM purchases WHERE customer_id = ? ORDER BY purchase_date DESC',
             [req.params.id]
         );
@@ -97,7 +97,7 @@ router.get('/:id', (req: Request, res: Response) => {
 });
 
 // Create customer
-router.post('/', (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response) => {
     try {
         const { name, phone, email, location, notes } = req.body;
 
@@ -108,9 +108,9 @@ router.post('/', (req: Request, res: Response) => {
 
         // Check for duplicate phone number or email
         if (phone) {
-            const existingByPhone = queryOne('SELECT id, name FROM customers WHERE phone = ?', [phone]);
+            const existingByPhone = await queryOne('SELECT id, name FROM customers WHERE phone = ?', [phone]);
             if (existingByPhone) {
-                return res.status(409).json({ 
+                return res.status(409).json({
                     error: 'Duplicate customer',
                     message: `Customer with phone ${phone} already exists: ${(existingByPhone as any).name}`,
                     existingCustomerId: (existingByPhone as any).id
@@ -119,9 +119,9 @@ router.post('/', (req: Request, res: Response) => {
         }
 
         if (email) {
-            const existingByEmail = queryOne('SELECT id, name FROM customers WHERE email = ?', [email]);
+            const existingByEmail = await queryOne('SELECT id, name FROM customers WHERE email = ?', [email]);
             if (existingByEmail) {
-                return res.status(409).json({ 
+                return res.status(409).json({
                     error: 'Duplicate customer',
                     message: `Customer with email ${email} already exists: ${(existingByEmail as any).name}`,
                     existingCustomerId: (existingByEmail as any).id
@@ -129,13 +129,13 @@ router.post('/', (req: Request, res: Response) => {
             }
         }
 
-        const result = execute(
+        const result = await execute(
             `INSERT INTO customers (name, phone, email, location, notes, status)
              VALUES (?, ?, ?, ?, ?, ?)`,
             [name, phone, email, location, notes, 'Active']
         );
 
-        const customer = queryOne('SELECT * FROM customers WHERE id = ?', [result.lastInsertRowid]);
+        const customer = await queryOne('SELECT * FROM customers WHERE id = ?', [result.lastInsertRowid]);
         res.status(201).json(customer);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -143,7 +143,7 @@ router.post('/', (req: Request, res: Response) => {
 });
 
 // Update customer
-router.put('/:id', (req: Request, res: Response) => {
+router.put('/:id', async (req: Request, res: Response) => {
     try {
         const { name, phone, email, location, notes, status } = req.body;
 
@@ -152,13 +152,13 @@ router.put('/:id', (req: Request, res: Response) => {
             return res.status(400).json({ error: validation.error });
         }
 
-        const customer = queryOne('SELECT * FROM customers WHERE id = ?', [req.params.id]);
+        const customer = await queryOne('SELECT * FROM customers WHERE id = ?', [req.params.id]);
         if (!customer) {
             return res.status(404).json({ error: 'Customer not found' });
         }
 
-        execute(
-            `UPDATE customers 
+        await execute(
+            `UPDATE customers
              SET name = COALESCE(?, name),
                  phone = COALESCE(?, phone),
                  email = COALESCE(?, email),
@@ -169,7 +169,7 @@ router.put('/:id', (req: Request, res: Response) => {
             [name, phone, email, location, notes, status, req.params.id]
         );
 
-        const updated = queryOne('SELECT * FROM customers WHERE id = ?', [req.params.id]);
+        const updated = await queryOne('SELECT * FROM customers WHERE id = ?', [req.params.id]);
         res.json(updated);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -177,14 +177,14 @@ router.put('/:id', (req: Request, res: Response) => {
 });
 
 // Delete customer
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response) => {
     try {
-        const customer = queryOne('SELECT * FROM customers WHERE id = ?', [req.params.id]);
+        const customer = await queryOne('SELECT * FROM customers WHERE id = ?', [req.params.id]);
         if (!customer) {
             return res.status(404).json({ error: 'Customer not found' });
         }
 
-        execute('DELETE FROM customers WHERE id = ?', [req.params.id]);
+        await execute('DELETE FROM customers WHERE id = ?', [req.params.id]);
         res.json({ message: 'Customer deleted successfully' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -192,10 +192,10 @@ router.delete('/:id', (req: Request, res: Response) => {
 });
 
 // Get customer statistics
-router.get('/stats/overview', (req: Request, res: Response) => {
+router.get('/stats/overview', async (req: Request, res: Response) => {
     try {
-        const stats = queryOne(`
-            SELECT 
+        const stats = await queryOne(`
+            SELECT
                 COUNT(*) as total_customers,
                 COUNT(CASE WHEN status = 'Active' THEN 1 END) as active_customers,
                 COUNT(CASE WHEN status = 'VIP' THEN 1 END) as vip_customers,
@@ -212,10 +212,10 @@ router.get('/stats/overview', (req: Request, res: Response) => {
 });
 
 // Remove duplicate customers by phone number
-router.post('/cleanup/duplicates', (req: Request, res: Response) => {
+router.post('/cleanup/duplicates', async (req: Request, res: Response) => {
     try {
         // Find all phone numbers that have duplicates
-        const duplicates = query(`
+        const duplicates = await query(`
             SELECT phone, COUNT(*) as count
             FROM customers
             WHERE phone IS NOT NULL AND phone != ''
@@ -235,21 +235,21 @@ router.post('/cleanup/duplicates', (req: Request, res: Response) => {
         let kept = 0;
 
         // For each duplicate phone, keep the oldest one and delete the rest
-        duplicates.forEach((dup: any) => {
-            const customers = query(
+        for (const dup of duplicates) {
+            const customers = await query(
                 `SELECT id, created_at FROM customers WHERE phone = ? ORDER BY created_at ASC`,
-                [dup.phone]
+                [(dup as any).phone]
             );
 
             // Keep the first one (oldest)
             kept++;
-            
+
             // Delete the rest
             for (let i = 1; i < customers.length; i++) {
-                execute('DELETE FROM customers WHERE id = ?', [(customers[i] as any).id]);
+                await execute('DELETE FROM customers WHERE id = ?', [(customers[i] as any).id]);
                 removed++;
             }
-        });
+        }
 
         res.json({
             message: 'Duplicates removed successfully',

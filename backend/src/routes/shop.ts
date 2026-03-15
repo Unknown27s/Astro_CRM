@@ -6,11 +6,12 @@ const router = Router();
 // ── PUBLIC ENDPOINTS (no auth required) ──────────────────────────────────────
 
 // GET store front data (settings + visible products)
-router.get('/storefront', (req: Request, res: Response) => {
+router.get('/storefront', async (req: Request, res: Response) => {
     try {
-        const settings = query('SELECT * FROM store_settings LIMIT 1')[0] || {};
-        const products = query(
-            'SELECT * FROM products WHERE is_visible = 1 ORDER BY created_at DESC'
+        const settingsRows = await query('SELECT * FROM store_settings LIMIT 1');
+        const settings = settingsRows[0] || {};
+        const products = await query(
+            'SELECT * FROM products WHERE is_visible = true ORDER BY created_at DESC'
         );
         res.json({ settings, products });
     } catch (error: any) {
@@ -19,12 +20,12 @@ router.get('/storefront', (req: Request, res: Response) => {
 });
 
 // POST validate a coupon code (public)
-router.post('/validate-coupon', (req: Request, res: Response) => {
+router.post('/validate-coupon', async (req: Request, res: Response) => {
     try {
         const { code, cart_total } = req.body;
         if (!code?.trim()) return res.status(400).json({ error: 'Coupon code is required' });
 
-        const coupon = queryOne<any>('SELECT * FROM coupons WHERE code = ? AND is_active = 1', [code.trim().toUpperCase()]);
+        const coupon = await queryOne<any>('SELECT * FROM coupons WHERE code = ? AND is_active = true', [code.trim().toUpperCase()]);
         if (!coupon) return res.status(400).json({ error: 'Invalid or expired coupon code' });
 
         // Check expiry
@@ -69,7 +70,7 @@ router.post('/validate-coupon', (req: Request, res: Response) => {
 
 // POST place an order (public)
 // Also: auto-creates or links a CRM customer, creates a purchase record, deducts product stock
-router.post('/order', (req: Request, res: Response) => {
+router.post('/order', async (req: Request, res: Response) => {
     try {
         const {
             customer_name, customer_phone, customer_email,
@@ -89,9 +90,9 @@ router.post('/order', (req: Request, res: Response) => {
         const name = customer_name.trim();
         const today = new Date().toISOString().split('T')[0];
 
-        transaction(() => {
+        await transaction(async (client) => {
             // 1. Insert online order
-            execute(
+            await execute(
                 `INSERT INTO online_orders
                  (order_number, customer_name, customer_phone, customer_email, customer_address, items, total_amount, notes, coupon_code, discount_amount)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -105,21 +106,21 @@ router.post('/order', (req: Request, res: Response) => {
 
             // 1b. Increment coupon used_count if a coupon was applied
             if (coupon_code) {
-                execute('UPDATE coupons SET used_count = used_count + 1 WHERE code = ?', [coupon_code.toUpperCase()]);
+                await execute('UPDATE coupons SET used_count = used_count + 1 WHERE code = ?', [coupon_code.toUpperCase()]);
             }
 
             // 2. Find or create CRM customer by phone
-            let customer = queryOne<any>('SELECT * FROM customers WHERE phone = ?', [phone]);
+            let customer = await queryOne<any>('SELECT * FROM customers WHERE phone = ?', [phone]);
             if (!customer) {
-                execute(
+                await execute(
                     `INSERT INTO customers (name, phone, email, location, notes, status, total_spent, total_purchases, last_purchase_date)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                     [name, phone, customer_email || '', customer_address || '', 'Online customer', 'Active', amount, 1, today]
                 );
-                customer = queryOne<any>('SELECT * FROM customers WHERE phone = ?', [phone]);
+                customer = await queryOne<any>('SELECT * FROM customers WHERE phone = ?', [phone]);
             } else {
                 // Update existing customer stats
-                execute(
+                await execute(
                     `UPDATE customers SET
                         total_spent = COALESCE(total_spent, 0) + ?,
                         total_purchases = COALESCE(total_purchases, 0) + 1,
@@ -132,7 +133,7 @@ router.post('/order', (req: Request, res: Response) => {
 
             // 3. Create purchase record linked to customer
             if (customer) {
-                execute(
+                await execute(
                     `INSERT INTO purchases (customer_id, items, total_amount, payment_method, purchase_date, notes)
                      VALUES (?, ?, ?, ?, ?, ?)`,
                     [customer.id, JSON.stringify(items), amount, 'Online', today, `Online Order: ${orderNumber}`]
@@ -142,8 +143,8 @@ router.post('/order', (req: Request, res: Response) => {
             // 4. Deduct product stock for items that match by name
             for (const item of items) {
                 if (item.name && item.qty) {
-                    execute(
-                        `UPDATE products SET stock_qty = MAX(0, stock_qty - ?) WHERE name = ? AND stock_qty > 0`,
+                    await execute(
+                        `UPDATE products SET stock_qty = GREATEST(0, stock_qty - ?) WHERE name = ? AND stock_qty > 0`,
                         [Number(item.qty), item.name]
                     );
                 }
@@ -159,9 +160,10 @@ router.post('/order', (req: Request, res: Response) => {
 // ── ADMIN ENDPOINTS (auth required via global middleware) ─────────────────────
 
 // GET store settings
-router.get('/settings', (req: Request, res: Response) => {
+router.get('/settings', async (req: Request, res: Response) => {
     try {
-        const settings = query('SELECT * FROM store_settings LIMIT 1')[0] || {};
+        const settingsRows = await query('SELECT * FROM store_settings LIMIT 1');
+        const settings = settingsRows[0] || {};
         res.json({ settings });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -169,7 +171,7 @@ router.get('/settings', (req: Request, res: Response) => {
 });
 
 // PUT update store settings
-router.put('/settings', (req: Request, res: Response) => {
+router.put('/settings', async (req: Request, res: Response) => {
     try {
         const {
             store_name, store_tagline, primary_color, banner_text,
@@ -177,7 +179,7 @@ router.put('/settings', (req: Request, res: Response) => {
             asi_api_key
         } = req.body;
 
-        execute(
+        await execute(
             `UPDATE store_settings SET
                 store_name=?, store_tagline=?, primary_color=?, banner_text=?,
                 contact_phone=?, contact_email=?, currency=?, whatsapp_number=?,
@@ -193,11 +195,12 @@ router.put('/settings', (req: Request, res: Response) => {
                 currency || '₹',
                 whatsapp_number || '',
                 asi_api_key || '',
-                is_active ? 1 : 0
+                is_active ? true : false
             ]
         );
 
-        const settings = query('SELECT * FROM store_settings LIMIT 1')[0];
+        const settingsRows = await query('SELECT * FROM store_settings LIMIT 1');
+        const settings = settingsRows[0];
         res.json({ settings });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -205,9 +208,9 @@ router.put('/settings', (req: Request, res: Response) => {
 });
 
 // GET all online orders (admin)
-router.get('/orders', (req: Request, res: Response) => {
+router.get('/orders', async (req: Request, res: Response) => {
     try {
-        const orders = query('SELECT * FROM online_orders ORDER BY created_at DESC');
+        const orders = await query('SELECT * FROM online_orders ORDER BY created_at DESC');
         res.json({ orders });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -215,7 +218,7 @@ router.get('/orders', (req: Request, res: Response) => {
 });
 
 // PATCH update order status (admin)
-router.patch('/orders/:id', (req: Request, res: Response) => {
+router.patch('/orders/:id', async (req: Request, res: Response) => {
     try {
         const { status } = req.body;
         const validStatuses = ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
@@ -223,8 +226,9 @@ router.patch('/orders/:id', (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Invalid status' });
         }
 
-        execute('UPDATE online_orders SET status = ? WHERE id = ?', [status, req.params.id]);
-        const order = query('SELECT * FROM online_orders WHERE id = ?', [req.params.id])[0];
+        await execute('UPDATE online_orders SET status = ? WHERE id = ?', [status, req.params.id]);
+        const orderRows = await query('SELECT * FROM online_orders WHERE id = ?', [req.params.id]);
+        const order = orderRows[0];
         res.json({ order });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -232,9 +236,9 @@ router.patch('/orders/:id', (req: Request, res: Response) => {
 });
 
 // DELETE order (admin)
-router.delete('/orders/:id', (req: Request, res: Response) => {
+router.delete('/orders/:id', async (req: Request, res: Response) => {
     try {
-        execute('DELETE FROM online_orders WHERE id = ?', [req.params.id]);
+        await execute('DELETE FROM online_orders WHERE id = ?', [req.params.id]);
         res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
