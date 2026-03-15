@@ -185,6 +185,212 @@ router.post('/import-csv', (req: Request, res: Response) => {
     }
 });
 
+// Export purchases with customer spending details for Google Sheets
+router.get('/export/purchases', (req: Request, res: Response) => {
+    try {
+        const purchases = query(`
+            SELECT
+                p.id,
+                c.name as customer_name,
+                c.phone as customer_phone,
+                c.email as customer_email,
+                p.items,
+                p.total_amount,
+                p.payment_method,
+                p.purchase_date,
+                c.total_spent,
+                c.total_purchases as customer_total_purchases
+            FROM purchases p
+            JOIN customers c ON p.customer_id = c.id
+            ORDER BY p.purchase_date DESC
+            LIMIT 500
+        `);
+
+        // Format for Google Sheets
+        const formatted = purchases.map((p: any) => {
+            const items = JSON.parse(p.items || '[]');
+            const itemList = items.map((i: any) => `${i.name} (${i.qty})`).join('; ');
+
+            return {
+                purchase_id: p.id,
+                customer_name: p.customer_name,
+                customer_phone: p.customer_phone,
+                customer_email: p.customer_email,
+                items_purchased: itemList,
+                items_count: items.length,
+                amount: p.total_amount,
+                payment_method: p.payment_method || 'Cash',
+                purchase_date: p.purchase_date,
+                customer_total_spent: p.total_spent,
+                customer_purchase_count: p.customer_total_purchases,
+            };
+        });
+
+        res.json({
+            purchases: formatted,
+            total: formatted.length,
+            exported_at: new Date().toISOString(),
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Export customer spending breakdown for Google Sheets
+router.get('/export/customer-spending', (req: Request, res: Response) => {
+    try {
+        const customers = query(`
+            SELECT
+                c.id,
+                c.name,
+                c.phone,
+                c.email,
+                c.location,
+                c.total_spent,
+                c.total_purchases,
+                c.first_purchase_date,
+                c.last_purchase_date,
+                c.status
+            FROM customers c
+            WHERE c.total_purchases > 0
+            ORDER BY c.total_spent DESC
+            LIMIT 500
+        `);
+
+        // Get product breakdown per customer
+        const formatted = customers.map((c: any) => {
+            // Get top products bought by this customer
+            const purchases = query(`
+                SELECT p.items FROM purchases p
+                WHERE p.customer_id = ?
+                ORDER BY p.purchase_date DESC
+                LIMIT 10
+            `, [c.id]);
+
+            const productMap: any = {};
+            purchases.forEach((p: any) => {
+                const items = JSON.parse(p.items || '[]');
+                items.forEach((item: any) => {
+                    if (!productMap[item.name]) {
+                        productMap[item.name] = { qty: 0, total: 0 };
+                    }
+                    productMap[item.name].qty += item.qty;
+                    productMap[item.name].total += item.qty * item.price;
+                });
+            });
+
+            const topProducts = Object.entries(productMap)
+                .sort((a: any, b: any) => b[1].total - a[1].total)
+                .slice(0, 3)
+                .map(([name, data]: any) => `${name} (${data.qty}x, ₹${data.total})`)
+                .join('; ');
+
+            return {
+                customer_name: c.name,
+                customer_phone: c.phone,
+                customer_email: c.email,
+                customer_location: c.location,
+                total_spent: c.total_spent,
+                total_purchases: c.total_purchases,
+                avg_purchase: (c.total_spent / c.total_purchases).toFixed(2),
+                first_purchase: c.first_purchase_date,
+                last_purchase: c.last_purchase_date,
+                status: c.status,
+                top_products: topProducts,
+            };
+        });
+
+        res.json({
+            customers: formatted,
+            total: formatted.length,
+            exported_at: new Date().toISOString(),
+            total_customer_value: formatted.reduce((s, c: any) => s + c.total_spent, 0),
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Sync purchases to Google Sheets (mark stock as used)
+router.post('/sync-purchases', (req: Request, res: Response) => {
+    try {
+        const purchases = query(`
+            SELECT p.id, p.items FROM purchases p
+            WHERE p.created_at > datetime('now', '-1 hour')
+            ORDER BY p.created_at DESC
+        `);
+
+        let stockUpdated = 0;
+        purchases.forEach((p: any) => {
+            const items = JSON.parse(p.items || '[]');
+            items.forEach((item: any) => {
+                // Find product by name and reduce stock
+                const product = queryOne('SELECT id FROM products WHERE name = ? LIMIT 1', [item.name]);
+                if (product) {
+                    execute(
+                        'UPDATE products SET current_stock = current_stock - ? WHERE id = ?',
+                        [item.qty, (product as any).id]
+                    );
+                    stockUpdated++;
+                }
+            });
+        });
+
+        res.json({
+            message: 'Purchase sync completed',
+            purchases_processed: purchases.length,
+            stock_items_updated: stockUpdated,
+            synced_at: new Date().toISOString(),
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get format template for customer spending Google Sheet
+router.get('/format/customer-spending', (req: Request, res: Response) => {
+    res.json({
+        sheet_name: 'Customer Spending Report',
+        columns: [
+            { name: 'customer_name', description: 'Customer name', example: 'Rajesh Kumar' },
+            { name: 'customer_phone', description: 'Customer phone', example: '9876543210' },
+            { name: 'customer_email', description: 'Customer email', example: 'rajesh@example.com' },
+            { name: 'customer_location', description: 'Customer city/location', example: 'Mumbai' },
+            { name: 'total_spent', description: 'Total amount spent', example: '₹15,000' },
+            { name: 'total_purchases', description: 'Number of purchases', example: '5' },
+            { name: 'avg_purchase', description: 'Average purchase value', example: '₹3,000' },
+            { name: 'first_purchase', description: 'First purchase date', example: '2025-01-15' },
+            { name: 'last_purchase', description: 'Last purchase date', example: '2026-03-15' },
+            { name: 'status', description: 'Customer status', example: 'Active/VIP/Inactive' },
+            { name: 'top_products', description: 'Top 3 products purchased', example: 'Shirt (10x, ₹5999); Pants (5x, ₹3995)' },
+        ],
+        frequency: 'Real-time (auto-updates on purchase)',
+        updates_on: 'New purchase, purchase edit/delete, customer status change',
+    });
+});
+
+// Get format template for purchases Google Sheet
+router.get('/format/purchases', (req: Request, res: Response) => {
+    res.json({
+        sheet_name: 'Purchase Transactions',
+        columns: [
+            { name: 'purchase_id', description: 'Unique purchase ID', example: '12345' },
+            { name: 'customer_name', description: 'Customer name', example: 'Priya Singh' },
+            { name: 'customer_phone', description: 'Customer phone', example: '9876543211' },
+            { name: 'customer_email', description: 'Customer email', example: 'priya@example.com' },
+            { name: 'items_purchased', description: 'Products and quantities', example: 'Shirt (2); Shoe (1)' },
+            { name: 'items_count', description: 'Total item types', example: '2' },
+            { name: 'amount', description: 'Total purchase amount', example: '₹3,697' },
+            { name: 'payment_method', description: 'Payment type', example: 'Cash/Card/Online' },
+            { name: 'purchase_date', description: 'Purchase date', example: '2026-03-15' },
+            { name: 'customer_total_spent', description: 'Customer lifetime spending', example: '₹15,000' },
+            { name: 'customer_purchase_count', description: 'Customer total purchases', example: '5' },
+        ],
+        frequency: 'Real-time (auto-updates on purchase)',
+        updates_on: 'New purchase, purchase edit/delete',
+    });
+});
+
 // Get sync stats
 router.get('/stats', (req: Request, res: Response) => {
     try {
