@@ -22,6 +22,8 @@ export default function Campaigns() {
     const [newCampaign, setNewCampaign] = useState({
         name: '',
         message: '',
+        email_subject: '',
+        campaign_type: 'SMS',
         target_audience: 'all',
         audience_filter: {},
     });
@@ -64,6 +66,11 @@ export default function Campaigns() {
             return;
         }
 
+        if ((newCampaign.campaign_type === 'Email' || newCampaign.campaign_type === 'Both') && !newCampaign.email_subject.trim()) {
+            toast.error('Email subject is required for email campaigns');
+            return;
+        }
+
         setLoading(true);
         try {
             const response = await campaigns.create(newCampaign);
@@ -71,6 +78,8 @@ export default function Campaigns() {
             setNewCampaign({
                 name: '',
                 message: '',
+                email_subject: '',
+                campaign_type: 'SMS',
                 target_audience: 'all',
                 audience_filter: {},
             });
@@ -157,8 +166,8 @@ export default function Campaigns() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-neutral-900">SMS Campaigns</h1>
-                    <p className="text-neutral-500 mt-1">Create and send targeted messages to customers</p>
+                    <h1 className="text-3xl font-bold text-neutral-900">Campaigns</h1>
+                    <p className="text-neutral-500 mt-1">Create and send targeted SMS & Email campaigns to customers</p>
                 </div>
                 <Button onClick={() => setShowCreate(true)} size="lg" className="gap-2">
                     <Plus size={20} />
@@ -339,6 +348,36 @@ export default function Campaigns() {
                             onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })}
                         />
                     </div>
+
+                    {/* Campaign Type */}
+                    <div>
+                        <Label htmlFor="campaign-type">Campaign Type *</Label>
+                        <select
+                            id="campaign-type"
+                            value={newCampaign.campaign_type}
+                            onChange={(e) => setNewCampaign({ ...newCampaign, campaign_type: e.target.value })}
+                            className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                        >
+                            <option value="SMS">SMS Only</option>
+                            <option value="Email">Email Only</option>
+                            <option value="Both">Both SMS & Email</option>
+                        </select>
+                        <p className="text-xs text-neutral-500 mt-1">Choose how to send your campaign</p>
+                    </div>
+
+                    {/* Email Subject (conditional) */}
+                    {(newCampaign.campaign_type === 'Email' || newCampaign.campaign_type === 'Both') && (
+                        <div>
+                            <Label htmlFor="email-subject">Email Subject *</Label>
+                            <Input
+                                id="email-subject"
+                                placeholder="e.g., Exclusive Summer Offer Inside!"
+                                value={newCampaign.email_subject}
+                                onChange={(e) => setNewCampaign({ ...newCampaign, email_subject: e.target.value })}
+                            />
+                            <p className="text-xs text-neutral-500 mt-1">Subject line for email campaigns</p>
+                        </div>
+                    )}
 
                     {/* Target Audience */}
                     <div>

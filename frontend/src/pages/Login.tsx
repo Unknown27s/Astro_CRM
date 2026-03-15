@@ -33,7 +33,7 @@ export default function Login({ setAuth }: LoginProps) {
 
             localStorage.setItem('token', response.data.token);
             setAuth(true);
-            toast.success(isLogin ? 'Welcome back!' : 'Account created successfully!');
+            toast.success(isLogin ? 'Welcome to AstroCRM!' : 'Account created successfully!');
             navigate('/');
         } catch (err: any) {
             const errorMsg = err.response?.data?.error || 'An error occurred';
@@ -45,31 +45,58 @@ export default function Login({ setAuth }: LoginProps) {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-primary-600 via-primary-500 to-accent-500 flex items-center justify-center p-4">
-            {/* Background decoration */}
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-primary-900 to-primary-800 flex items-center justify-center p-4 relative overflow-hidden">
+            {/* Animated background elements - 3D effect */}
             <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-400 rounded-full opacity-20 blur-3xl" />
-                <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-accent-400 rounded-full opacity-20 blur-3xl" />
+                {/* Large gradient orbs */}
+                <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary-600 rounded-full opacity-30 blur-3xl animate-pulse" />
+                <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-accent-600 rounded-full opacity-25 blur-3xl animate-pulse" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-primary-500 rounded-full opacity-10 blur-3xl" />
+
+                {/* Animated accent lines */}
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary-400 to-transparent opacity-20 animate-pulse" />
+                <div className="absolute bottom-0 right-0 w-full h-1 bg-gradient-to-l from-transparent via-accent-400 to-transparent opacity-20 animate-pulse" />
             </div>
 
-            {/* Card */}
-            <div className="relative w-full max-w-md">
-                <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-                    {/* Header */}
-                    <div className="bg-gradient-to-r from-primary-600 to-primary-700 p-8 text-center text-white">
-                        <div className="flex justify-center mb-4">
-                            <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                                {isLogin ? (
-                                    <LogIn size={32} />
-                                ) : (
-                                    <UserPlus size={32} />
-                                )}
-                            </div>
+            {/* Card with 3D perspective */}
+            <div className="relative w-full max-w-md z-10">
+                {/* 3D Shadow effect */}
+                <div className="absolute inset-0 bg-gradient-to-b from-primary-400/20 to-transparent rounded-3xl blur-2xl transform scale-105" />
+
+                {/* Main card */}
+                <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl overflow-hidden border border-white/20 transform transition-transform duration-500 hover:shadow-3xl">
+                    {/* Header with gradient */}
+                    <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 p-8 text-center text-white relative overflow-hidden">
+                        {/* Gradient overlay background */}
+                        <div className="absolute inset-0 opacity-20">
+                            <div className="absolute top-0 right-0 w-40 h-40 bg-primary-400 rounded-full blur-2xl" />
                         </div>
-                        <h1 className="text-3xl font-bold">CRM Pro</h1>
-                        <p className="text-primary-100 mt-2">
-                            {isLogin ? 'Welcome back!' : 'Create your account'}
-                        </p>
+
+                        <div className="relative z-10">
+                            {/* Icon with 3D effect */}
+                            <div className="flex justify-center mb-6">
+                                <div className="relative">
+                                    <div className="absolute inset-0 bg-white/30 rounded-2xl blur-xl transform scale-110" />
+                                    <div className="relative p-4 bg-gradient-to-br from-white/30 to-white/10 rounded-2xl backdrop-blur-lg border border-white/40 shadow-2xl">
+                                        {isLogin ? (
+                                            <LogIn size={36} className="text-white drop-shadow-lg" />
+                                        ) : (
+                                            <UserPlus size={36} className="text-white drop-shadow-lg" />
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h1 className="text-4xl font-bold tracking-tight drop-shadow-lg">AstroCRM</h1>
+                            <p className="text-primary-100 mt-2 text-lg font-semibold">
+                                {isLogin ? 'Retail Management Platform' : 'Join AstroCRM Today'}
+                            </p>
+                            <p className="text-primary-50 mt-3 text-sm leading-relaxed max-w-xs mx-auto">
+                                {isLogin
+                                    ? 'Manage customers, inventory, and campaigns with AI-powered insights'
+                                    : 'Take control of your retail business with intelligent CRM solutions'}
+                            </p>
+                        </div>
                     </div>
 
                     {/* Form */}
@@ -91,6 +118,7 @@ export default function Login({ setAuth }: LoginProps) {
                                         onChange={(e) => setFullName(e.target.value)}
                                         required={!isLogin}
                                     />
+                                    <p className="text-xs text-neutral-500 mt-1">Your full name for your business profile</p>
                                 </div>
                             )}
 
@@ -109,6 +137,7 @@ export default function Login({ setAuth }: LoginProps) {
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
                                 />
+                                <p className="text-xs text-neutral-500 mt-1">We'll never share your email</p>
                             </div>
 
                             <div>
@@ -126,6 +155,9 @@ export default function Login({ setAuth }: LoginProps) {
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
                                 />
+                                <p className="text-xs text-neutral-500 mt-1">
+                                    {!isLogin ? 'Minimum 6 characters recommended' : 'Case-sensitive'}
+                                </p>
                             </div>
 
                             {error && (
@@ -174,10 +206,15 @@ export default function Login({ setAuth }: LoginProps) {
                     </div>
                 </div>
 
-                {/* Footer */}
-                <p className="text-center text-white/80 text-sm mt-6">
-                    v3.0.0 • Retail Edition
-                </p>
+                {/* Footer branding */}
+                <div className="text-center space-y-2 mt-8">
+                    <p className="text-white/70 text-xs tracking-widest font-semibold uppercase">
+                        AstroCRM v3.0.0 • Retail Edition
+                    </p>
+                    <p className="text-white/50 text-xs">
+                        Powered by AI • Built for Growth
+                    </p>
+                </div>
             </div>
         </div>
     );

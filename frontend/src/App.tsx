@@ -12,6 +12,7 @@ import OnlineStore from './pages/OnlineStore';
 import Shop from './pages/Shop';
 import Analytics from './pages/Analytics';
 import Reports from './pages/Reports';
+import StockManagement from './pages/StockManagement';
 import AIAssistant from './components/AIAssistant';
 import AIStudio from './pages/AIStudio';
 
@@ -49,6 +50,7 @@ function App() {
           <Route path="campaigns" element={<Campaigns />} />
           <Route path="insights" element={<Insights />} />
           <Route path="import" element={<Import />} />
+          <Route path="stock" element={<StockManagement />} />
           <Route path="online-store" element={<OnlineStore />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="reports" element={<Reports />} />

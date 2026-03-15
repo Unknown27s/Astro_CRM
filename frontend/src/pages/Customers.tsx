@@ -11,6 +11,7 @@ import {
     Search,
     TrendingUp,
     Edit2,
+    Trash2,
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -31,6 +32,9 @@ export default function Customers() {
     const [statusFilter, setStatusFilter] = useState('');
     const [loading, setLoading] = useState(false);
     const [listLoading, setListLoading] = useState(true);
+    const [selectedForDelete, setSelectedForDelete] = useState<Set<number>>(new Set()); // Bulk delete
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<'single' | 'bulk' | null>(null);
 
     const [newCustomer, setNewCustomer] = useState({
         name: '',
@@ -135,6 +139,66 @@ export default function Customers() {
             toast.error(error.response?.data?.error || 'Error updating customer');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDeleteCustomer = async (customerId: number) => {
+        setLoading(true);
+        try {
+            await customers.delete(customerId);
+            if (selectedCustomer?.id === customerId) {
+                setSelectedCustomer(null);
+            }
+            await fetchCustomers();
+            toast.success('Customer deleted successfully');
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || 'Error deleting customer');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        setLoading(true);
+        try {
+            const ids = Array.from(selectedForDelete);
+            for (const id of ids) {
+                try {
+                    await customers.delete(id);
+                } catch (error) {
+                    console.error(`Error deleting customer ${id}:`, error);
+                }
+            }
+            setSelectedForDelete(new Set());
+            setShowDeleteConfirm(false);
+            setDeleteTarget(null);
+            if (selectedCustomer && selectedForDelete.has(selectedCustomer.id)) {
+                setSelectedCustomer(null);
+            }
+            await fetchCustomers();
+            toast.success(`${ids.length} customer(s) deleted successfully`);
+        } catch (error: any) {
+            toast.error('Error deleting customers');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleSelectForDelete = (customerId: number) => {
+        const newSet = new Set(selectedForDelete);
+        if (newSet.has(customerId)) {
+            newSet.delete(customerId);
+        } else {
+            newSet.add(customerId);
+        }
+        setSelectedForDelete(newSet);
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedForDelete.size === customerList.length) {
+            setSelectedForDelete(new Set());
+        } else {
+            setSelectedForDelete(new Set(customerList.map((c) => c.id)));
         }
     };
 
@@ -259,8 +323,25 @@ export default function Customers() {
                 <div>
                     <Card className="h-full">
                         <CardHeader>
-                            <CardTitle className="text-lg">Customer List</CardTitle>
-                            <CardDescription>{customerList.length} customers</CardDescription>
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <CardTitle className="text-lg">Customer List</CardTitle>
+                                    <CardDescription>{customerList.length} customers</CardDescription>
+                                </div>
+                                {selectedForDelete.size > 0 && (
+                                    <Button
+                                        variant="danger"
+                                        size="sm"
+                                        onClick={() => {
+                                            setDeleteTarget('bulk');
+                                            setShowDeleteConfirm(true);
+                                        }}
+                                    >
+                                        <Trash2 size={16} className="mr-1" />
+                                        Delete ({selectedForDelete.size})
+                                    </Button>
+                                )}
+                            </div>
                         </CardHeader>
                         <CardContent>
                             {listLoading ? (
@@ -269,26 +350,64 @@ export default function Customers() {
                                 </div>
                             ) : customerList.length > 0 ? (
                                 <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                                    {customerList.map((customer) => (
+                                    {selectedForDelete.size > 0 && (
                                         <button
-                                            key={customer.id}
-                                            onClick={() => handleSelectCustomer(customer)}
-                                            className={`w-full text-left p-3 rounded-lg border-2 transition-all ${selectedCustomer?.id === customer.id
-                                                    ? 'border-primary-500 bg-primary-50'
-                                                    : 'border-neutral-200 hover:border-primary-300 hover:bg-neutral-50'
-                                                }`}
+                                            onClick={toggleSelectAll}
+                                            className="w-full text-left p-3 rounded-lg border-2 border-primary-300 bg-primary-50 flex items-center gap-2 mb-2"
                                         >
-                                            <div className="flex justify-between items-start gap-2 mb-1">
-                                                <h3 className="font-semibold text-neutral-900 truncate">{customer.name}</h3>
-                                                <Badge variant={getStatusBadgeVariant(customer.status)} className="text-xs whitespace-nowrap">
-                                                    {customer.status}
-                                                </Badge>
-                                            </div>
-                                            <p className="text-xs text-neutral-500 truncate">{customer.email || customer.phone}</p>
-                                            <div className="text-sm font-medium text-success-600 mt-1">
-                                                ₹{customer.total_spent?.toFixed(0) || '0'}
-                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedForDelete.size === customerList.length}
+                                                onChange={toggleSelectAll}
+                                                className="w-4 h-4"
+                                            />
+                                            <span className="text-sm font-medium">
+                                                {selectedForDelete.size === customerList.length ? 'Deselect All' : 'Select All'}
+                                            </span>
                                         </button>
+                                    )}
+                                    {customerList.map((customer) => (
+                                        <div key={customer.id} className="flex gap-2 items-center">
+                                            {selectedForDelete.size > 0 && (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedForDelete.has(customer.id)}
+                                                    onChange={() => toggleSelectForDelete(customer.id)}
+                                                    className="w-4 h-4 rounded"
+                                                />
+                                            )}
+                                            <button
+                                                onClick={() => handleSelectCustomer(customer)}
+                                                className={`flex-1 text-left p-3 rounded-lg border-2 transition-all ${selectedCustomer?.id === customer.id
+                                                        ? 'border-primary-500 bg-primary-50'
+                                                        : 'border-neutral-200 hover:border-primary-300 hover:bg-neutral-50'
+                                                    }`}
+                                            >
+                                                <div className="flex justify-between items-start gap-2 mb-1">
+                                                    <h3 className="font-semibold text-neutral-900 truncate">{customer.name}</h3>
+                                                    <Badge variant={getStatusBadgeVariant(customer.status)} className="text-xs whitespace-nowrap">
+                                                        {customer.status}
+                                                    </Badge>
+                                                </div>
+                                                <p className="text-xs text-neutral-500 truncate">{customer.email || customer.phone}</p>
+                                                <div className="text-sm font-medium text-success-600 mt-1">
+                                                    ₹{customer.total_spent?.toFixed(0) || '0'}
+                                                </div>
+                                            </button>
+                                            {!selectedForDelete.has(customer.id) && (
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedCustomer(customer);
+                                                        setDeleteTarget('single');
+                                                        setShowDeleteConfirm(true);
+                                                    }}
+                                                    className="p-2 hover:bg-danger-50 hover:text-danger-600 rounded-lg transition-all"
+                                                    title="Delete customer"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            )}
+                                        </div>
                                     ))}
                                 </div>
                             ) : (
@@ -327,6 +446,18 @@ export default function Customers() {
                                             >
                                                 <Plus size={16} />
                                                 Purchase
+                                            </Button>
+                                            <Button
+                                                variant="danger"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setDeleteTarget('single');
+                                                    setShowDeleteConfirm(true);
+                                                }}
+                                                className="gap-2"
+                                            >
+                                                <Trash2 size={16} />
+                                                Delete
                                             </Button>
                                         </div>
                                     </div>
@@ -600,42 +731,57 @@ export default function Customers() {
                     </div>
                 }
             >
-                <div className="space-y-6 max-h-96 overflow-y-auto pr-2">
+                <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
                     {/* Items */}
                     <div>
-                        <Label className="mb-3 block">Items</Label>
-                        <div className="space-y-3">
+                        <Label className="mb-3 block">Purchase Items *</Label>
+                        <div className="space-y-3 bg-neutral-50 p-4 rounded-lg border border-neutral-200">
                             {newPurchase.items.map((item, index) => (
-                                <div key={index} className="flex gap-2">
-                                    <Input
-                                        placeholder="Item name"
-                                        value={item.name}
-                                        onChange={(e) => updatePurchaseItem(index, 'name', e.target.value)}
-                                        className="flex-1"
-                                    />
-                                    <Input
-                                        type="number"
-                                        placeholder="Qty"
-                                        value={item.qty}
-                                        onChange={(e) => updatePurchaseItem(index, 'qty', Number(e.target.value))}
-                                        className="w-20"
-                                    />
-                                    <Input
-                                        type="number"
-                                        placeholder="Price"
-                                        value={item.price}
-                                        onChange={(e) => updatePurchaseItem(index, 'price', Number(e.target.value))}
-                                        className="w-24"
-                                    />
-                                    {newPurchase.items.length > 1 && (
-                                        <Button
-                                            variant="danger"
-                                            size="sm"
-                                            onClick={() => removePurchaseItem(index)}
-                                        >
-                                            Remove
-                                        </Button>
-                                    )}
+                                <div key={index} className="space-y-2 p-3 bg-white rounded-lg border border-neutral-200">
+                                    <div className="flex gap-2 items-end">
+                                        <div className="flex-1">
+                                            <Label htmlFor={`item-name-${index}`} className="text-xs">Product Name *</Label>
+                                            <Input
+                                                id={`item-name-${index}`}
+                                                placeholder="Enter product name (e.g., Shirt, Shoe)"
+                                                value={item.name}
+                                                onChange={(e) => updatePurchaseItem(index, 'name', e.target.value)}
+                                                className="w-full"
+                                            />
+                                        </div>
+                                        <div className="w-20">
+                                            <Label htmlFor={`item-qty-${index}`} className="text-xs">Qty *</Label>
+                                            <Input
+                                                id={`item-qty-${index}`}
+                                                type="number"
+                                                placeholder="1"
+                                                value={item.qty}
+                                                onChange={(e) => updatePurchaseItem(index, 'qty', Number(e.target.value))}
+                                            />
+                                        </div>
+                                        <div className="w-24">
+                                            <Label htmlFor={`item-price-${index}`} className="text-xs">Price *</Label>
+                                            <Input
+                                                id={`item-price-${index}`}
+                                                type="number"
+                                                placeholder="0"
+                                                value={item.price}
+                                                onChange={(e) => updatePurchaseItem(index, 'price', Number(e.target.value))}
+                                            />
+                                        </div>
+                                        {newPurchase.items.length > 1 && (
+                                            <Button
+                                                variant="danger"
+                                                size="sm"
+                                                onClick={() => removePurchaseItem(index)}
+                                            >
+                                                <Trash2 size={16} />
+                                            </Button>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-neutral-600 text-right">
+                                        Subtotal: ₹{(item.qty * item.price).toFixed(2)}
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -646,58 +792,125 @@ export default function Customers() {
                             className="mt-3 w-full"
                         >
                             <Plus size={16} className="mr-2" />
-                            Add Item
+                            Add Another Item
                         </Button>
                     </div>
 
-                    {/* Details */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <Label htmlFor="payment-method">Payment Method</Label>
-                            <select
-                                id="payment-method"
-                                value={newPurchase.payment_method}
-                                onChange={(e) => setNewPurchase({ ...newPurchase, payment_method: e.target.value })}
-                                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
-                            >
-                                <option>Cash</option>
-                                <option>Card</option>
-                                <option>UPI</option>
-                                <option>Net Banking</option>
-                            </select>
-                        </div>
-                        <div>
-                            <Label htmlFor="purchase-date">Purchase Date</Label>
-                            <Input
-                                id="purchase-date"
-                                type="date"
-                                value={newPurchase.purchase_date}
-                                onChange={(e) => setNewPurchase({ ...newPurchase, purchase_date: e.target.value })}
-                            />
+                    {/* Purchase Details */}
+                    <div>
+                        <Label className="mb-3 block">Purchase Details</Label>
+                        <div className="grid grid-cols-3 gap-3">
+                            <div>
+                                <Label htmlFor="payment-method" className="text-xs">Payment Method</Label>
+                                <select
+                                    id="payment-method"
+                                    value={newPurchase.payment_method}
+                                    onChange={(e) => setNewPurchase({ ...newPurchase, payment_method: e.target.value })}
+                                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                                >
+                                    <option>Cash</option>
+                                    <option>Card</option>
+                                    <option>UPI</option>
+                                    <option>Net Banking</option>
+                                </select>
+                            </div>
+                            <div>
+                                <Label htmlFor="purchase-date" className="text-xs">Date *</Label>
+                                <Input
+                                    id="purchase-date"
+                                    type="date"
+                                    value={newPurchase.purchase_date}
+                                    onChange={(e) => setNewPurchase({ ...newPurchase, purchase_date: e.target.value })}
+                                    className="text-sm"
+                                />
+                            </div>
                         </div>
                     </div>
 
                     <div>
-                        <Label htmlFor="purchase-notes">Notes</Label>
+                        <Label htmlFor="purchase-notes" className="text-xs">Notes (Optional)</Label>
                         <textarea
                             id="purchase-notes"
-                            placeholder="Additional notes..."
+                            placeholder="Add any notes about this purchase..."
                             value={newPurchase.notes}
                             onChange={(e) => setNewPurchase({ ...newPurchase, notes: e.target.value })}
-                            className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                             rows={2}
                         />
                     </div>
 
                     {/* Total */}
-                    <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
-                        <div className="flex justify-between items-center">
-                            <span className="font-semibold text-neutral-900">Total Amount:</span>
-                            <span className="text-2xl font-bold text-primary-600">
-                                ₹{newPurchase.items.reduce((sum, item) => sum + item.qty * item.price, 0).toFixed(2)}
-                            </span>
+                    <div className="bg-gradient-to-r from-primary-50 to-primary-100 border border-primary-200 rounded-lg p-4">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm text-neutral-600">Subtotal:</span>
+                            <span className="font-semibold text-neutral-900">₹{newPurchase.items.reduce((sum, item) => sum + item.qty * item.price, 0).toFixed(2)}</span>
+                        </div>
+                        <div className="border-t border-primary-300 pt-2">
+                            <div className="flex justify-between items-center">
+                                <span className="font-semibold text-neutral-900">Total Amount:</span>
+                                <span className="text-2xl font-bold text-primary-600">
+                                    ₹{newPurchase.items.reduce((sum, item) => sum + item.qty * item.price, 0).toFixed(2)}
+                                </span>
+                            </div>
                         </div>
                     </div>
+                </div>
+            </Modal>
+            {/* Delete Confirmation Modal */}
+            <Modal
+                isOpen={showDeleteConfirm}
+                onClose={() => {
+                    setShowDeleteConfirm(false);
+                    setDeleteTarget(null);
+                }}
+                title="Confirm Delete"
+                size="sm"
+                footer={
+                    <div className="flex gap-3 justify-end">
+                        <Button
+                            variant="secondary"
+                            onClick={() => {
+                                setShowDeleteConfirm(false);
+                                setDeleteTarget(null);
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="danger"
+                            onClick={() => {
+                                if (deleteTarget === 'single' && selectedCustomer) {
+                                    handleDeleteCustomer(selectedCustomer.id);
+                                    setShowDeleteConfirm(false);
+                                    setDeleteTarget(null);
+                                } else if (deleteTarget === 'bulk') {
+                                    handleBulkDelete();
+                                }
+                            }}
+                            disabled={loading}
+                        >
+                            {loading ? 'Deleting...' : 'Delete'}
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-4">
+                    {deleteTarget === 'single' && (
+                        <div className="text-neutral-700">
+                            <p className="font-semibold mb-2">Are you sure you want to delete this customer?</p>
+                            <p className="text-sm text-neutral-600">
+                                <strong>{selectedCustomer?.name}</strong> and all their purchase history will be permanently removed.
+                            </p>
+                        </div>
+                    )}
+                    {deleteTarget === 'bulk' && (
+                        <div className="text-neutral-700">
+                            <p className="font-semibold mb-2">Delete {selectedForDelete.size} customer(s)?</p>
+                            <p className="text-sm text-neutral-600">
+                                This action cannot be undone. All selected customers and their purchase histories will be permanently removed.
+                            </p>
+                        </div>
+                    )}
                 </div>
             </Modal>
         </div>

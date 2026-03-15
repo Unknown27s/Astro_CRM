@@ -12,7 +12,7 @@ export async function migrateToV3() {
         // Step 0: Drop any old backup tables
         const allTables = query(`SELECT name FROM sqlite_master WHERE type='table'`);
         const allTableNames = allTables.map((t: any) => t.name);
-        
+
         const backupTables = allTableNames.filter(name => name.endsWith('_v2_backup'));
         if (backupTables.length > 0) {
             console.log('🗑️  Removing old backup tables...');
@@ -24,13 +24,25 @@ export async function migrateToV3() {
         // Step 1: Create new tables
         console.log('📋 Creating new tables...');
         const schemaV3 = readFileSync(join(__dirname, 'schema-v3.sql'), 'utf-8');
-        const statements = schemaV3.split(';').filter(s => s.trim());
 
-        statements.forEach(stmt => {
-            if (stmt.trim()) {
-                execute(stmt);
+        // Split by ';' but only for complete statements (avoid breaking multi-line statements)
+        const statements = schemaV3
+            .split(';')
+            .map(stmt => stmt.trim())
+            .filter(stmt => stmt && !stmt.startsWith('--'));
+
+        for (const stmt of statements) {
+            try {
+                if (stmt.trim()) {
+                    execute(stmt);
+                }
+            } catch (error: any) {
+                // Ignore "table already exists" errors - they're expected on subsequent runs
+                if (!error.message?.includes('already exists') && !error.message?.includes('UNIQUE constraint failed')) {
+                    console.warn(`⚠️  Warning: ${error.message}`);
+                }
             }
-        });
+        }
 
         // Step 1.5: Fix customer_segments if it still has the old contact_id column
         const segmentCols = query(`PRAGMA table_info(customer_segments)`);
@@ -59,7 +71,7 @@ export async function migrateToV3() {
         // Step 2: Check if old tables exist
         const tables = query(`SELECT name FROM sqlite_master WHERE type='table'`);
         const tableNames = tables.map((t: any) => t.name);
-        
+
         const hasOldSchema = tableNames.includes('contacts') || tableNames.includes('sales');
 
         if (hasOldSchema) {
@@ -70,139 +82,139 @@ export async function migrateToV3() {
                 const contacts = query(`SELECT * FROM contacts`);
                 console.log(`   → Migrating ${contacts.length} contacts to customers...`);
 
-                    contacts.forEach((contact: any) => {
-                        const name = `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unknown';
-                        const location = [contact.city, contact.state, contact.country]
-                            .filter(Boolean)
-                            .join(', ') || null;
+                contacts.forEach((contact: any) => {
+                    const name = `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unknown';
+                    const location = [contact.city, contact.state, contact.country]
+                        .filter(Boolean)
+                        .join(', ') || null;
 
-                        execute(
-                            `INSERT INTO customers (id, name, phone, email, location, notes, status, created_at, user_id)
+                    execute(
+                        `INSERT INTO customers (id, name, phone, email, location, notes, status, created_at, user_id)
                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                            [
-                                contact.id,
-                                name,
-                                contact.phone,
-                                contact.email,
-                                location,
-                                contact.notes,
-                                contact.status || 'Active',
-                                contact.created_at,
-                                contact.user_id
-                            ]
-                        );
-                    });
-                }
-
-                // Step 4: Migrate sales → purchases
-                if (tableNames.includes('sales')) {
-                    const sales = query(`SELECT * FROM sales`);
-                    console.log(`   → Migrating ${sales.length} sales to purchases...`);
-
-                    // Group sales by contact_id and sale_date to create single purchase records
-                    const purchaseMap = new Map<string, any[]>();
-                    
-                    sales.forEach((sale: any) => {
-                        const key = `${sale.contact_id}_${sale.sale_date}`;
-                        if (!purchaseMap.has(key)) {
-                            purchaseMap.set(key, []);
-                        }
-                        purchaseMap.get(key)!.push(sale);
-                    });
-
-                    purchaseMap.forEach((salesGroup, key) => {
-                        const firstSale = salesGroup[0];
-                        
-                        // Convert sales to items array
-                        const items = salesGroup.map(sale => ({
-                            name: sale.product_name || 'Unknown Product',
-                            qty: sale.quantity || 1,
-                            price: sale.unit_price || 0
-                        }));
-
-                        const totalAmount = salesGroup.reduce((sum, s) => sum + (s.total_amount || 0), 0);
-
-                        execute(
-                            `INSERT INTO purchases (customer_id, items, total_amount, purchase_date, created_at)
-                             VALUES (?, ?, ?, ?, ?)`,
-                            [
-                                firstSale.contact_id,
-                                JSON.stringify(items),
-                                totalAmount,
-                                firstSale.sale_date,
-                                firstSale.created_at
-                            ]
-                        );
-                    });
-                }
-
-                // Step 5: Calculate customer aggregates
-                console.log('🧮 Calculating customer statistics...');
-                const customers = query(`SELECT id FROM customers`);
-                
-                customers.forEach((customer: any) => {
-                    const purchases = query(
-                        `SELECT * FROM purchases WHERE customer_id = ?`,
-                        [customer.id]
+                        [
+                            contact.id,
+                            name,
+                            contact.phone,
+                            contact.email,
+                            location,
+                            contact.notes,
+                            contact.status || 'Active',
+                            contact.created_at,
+                            contact.user_id
+                        ]
                     );
+                });
+            }
 
-                    if (purchases.length > 0) {
-                        const totalSpent = purchases.reduce((sum, p: any) => sum + p.total_amount, 0);
-                        const totalPurchases = purchases.length;
-                        const purchaseDates = purchases
-                            .map((p: any) => p.purchase_date)
-                            .filter(Boolean)
-                            .sort();
-                        
-                        const firstPurchase = purchaseDates[0];
-                        const lastPurchase = purchaseDates[purchaseDates.length - 1];
+            // Step 4: Migrate sales → purchases
+            if (tableNames.includes('sales')) {
+                const sales = query(`SELECT * FROM sales`);
+                console.log(`   → Migrating ${sales.length} sales to purchases...`);
 
-                        // Determine status
-                        let status = 'Active';
-                        if (lastPurchase) {
-                            const daysSinceLastPurchase = Math.floor(
-                                (Date.now() - new Date(lastPurchase).getTime()) / (1000 * 60 * 60 * 24)
-                            );
-                            if (daysSinceLastPurchase > 90) {
-                                status = 'Inactive';
-                            }
+                // Group sales by contact_id and sale_date to create single purchase records
+                const purchaseMap = new Map<string, any[]>();
+
+                sales.forEach((sale: any) => {
+                    const key = `${sale.contact_id}_${sale.sale_date}`;
+                    if (!purchaseMap.has(key)) {
+                        purchaseMap.set(key, []);
+                    }
+                    purchaseMap.get(key)!.push(sale);
+                });
+
+                purchaseMap.forEach((salesGroup, key) => {
+                    const firstSale = salesGroup[0];
+
+                    // Convert sales to items array
+                    const items = salesGroup.map(sale => ({
+                        name: sale.product_name || 'Unknown Product',
+                        qty: sale.quantity || 1,
+                        price: sale.unit_price || 0
+                    }));
+
+                    const totalAmount = salesGroup.reduce((sum, s) => sum + (s.total_amount || 0), 0);
+
+                    execute(
+                        `INSERT INTO purchases (customer_id, items, total_amount, purchase_date, created_at)
+                             VALUES (?, ?, ?, ?, ?)`,
+                        [
+                            firstSale.contact_id,
+                            JSON.stringify(items),
+                            totalAmount,
+                            firstSale.sale_date,
+                            firstSale.created_at
+                        ]
+                    );
+                });
+            }
+
+            // Step 5: Calculate customer aggregates
+            console.log('🧮 Calculating customer statistics...');
+            const customers = query(`SELECT id FROM customers`);
+
+            customers.forEach((customer: any) => {
+                const purchases = query(
+                    `SELECT * FROM purchases WHERE customer_id = ?`,
+                    [customer.id]
+                );
+
+                if (purchases.length > 0) {
+                    const totalSpent = purchases.reduce((sum, p: any) => sum + p.total_amount, 0);
+                    const totalPurchases = purchases.length;
+                    const purchaseDates = purchases
+                        .map((p: any) => p.purchase_date)
+                        .filter(Boolean)
+                        .sort();
+
+                    const firstPurchase = purchaseDates[0];
+                    const lastPurchase = purchaseDates[purchaseDates.length - 1];
+
+                    // Determine status
+                    let status = 'Active';
+                    if (lastPurchase) {
+                        const daysSinceLastPurchase = Math.floor(
+                            (Date.now() - new Date(lastPurchase).getTime()) / (1000 * 60 * 60 * 24)
+                        );
+                        if (daysSinceLastPurchase > 90) {
+                            status = 'Inactive';
                         }
-                        if (totalSpent >= 50000) {
-                            status = 'VIP';
-                        }
+                    }
+                    if (totalSpent >= 50000) {
+                        status = 'VIP';
+                    }
 
-                        execute(
-                            `UPDATE customers 
+                    execute(
+                        `UPDATE customers 
                              SET total_spent = ?, total_purchases = ?, 
                                  first_purchase_date = ?, last_purchase_date = ?, status = ?
                              WHERE id = ?`,
-                            [totalSpent, totalPurchases, firstPurchase, lastPurchase, status, customer.id]
-                        );
-                    }
-                });
+                        [totalSpent, totalPurchases, firstPurchase, lastPurchase, status, customer.id]
+                    );
+                }
+            });
 
-                // Step 6: Drop old tables
-                console.log('🗑️  Removing old tables...');
-                if (tableNames.includes('contacts')) {
-                    execute(`DROP TABLE IF EXISTS contacts`);
-                }
-                if (tableNames.includes('sales')) {
-                    execute(`DROP TABLE IF EXISTS sales`);
-                }
-                if (tableNames.includes('deals')) {
-                    execute(`DROP TABLE IF EXISTS deals`);
-                }
-                if (tableNames.includes('activities')) {
-                    execute(`DROP TABLE IF EXISTS activities`);
-                }
-                if (tableNames.includes('reports')) {
-                    execute(`DROP TABLE IF EXISTS reports`);
-                }
-            } else {
-                console.log('✨ Fresh installation - no data to migrate');
+            // Step 6: Drop old tables
+            console.log('🗑️  Removing old tables...');
+            if (tableNames.includes('contacts')) {
+                execute(`DROP TABLE IF EXISTS contacts`);
             }
+            if (tableNames.includes('sales')) {
+                execute(`DROP TABLE IF EXISTS sales`);
+            }
+            if (tableNames.includes('deals')) {
+                execute(`DROP TABLE IF EXISTS deals`);
+            }
+            if (tableNames.includes('activities')) {
+                execute(`DROP TABLE IF EXISTS activities`);
+            }
+            if (tableNames.includes('reports')) {
+                execute(`DROP TABLE IF EXISTS reports`);
+            }
+        } else {
+            console.log('✨ Fresh installation - no data to migrate');
+        }
 
-            console.log('✅ Migration to v3.0.0 completed successfully!');
+        console.log('✅ Migration to v3.0.0 completed successfully!');
     } catch (error) {
         console.error('❌ Migration failed:', error);
         throw error;

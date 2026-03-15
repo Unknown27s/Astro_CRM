@@ -30,10 +30,11 @@ export default function Layout({ setAuth }: LayoutProps) {
     useEffect(() => {
         const handleResize = () => {
             const mobile = window.innerWidth < 768;
+            const smallMobile = window.innerWidth < 600; // Collapse to icons below 600px
             setIsMobile(mobile);
             if (mobile) {
                 setIsSidebarOpen(false);
-                setIsCollapsed(true);
+                setIsCollapsed(smallMobile); // Collapse on very small screens (< 600px)
             } else {
                 setIsSidebarOpen(true);
                 setIsCollapsed(window.innerWidth < 1024);
@@ -58,6 +59,7 @@ export default function Layout({ setAuth }: LayoutProps) {
         { path: '/analytics', icon: Sparkles, label: 'ML Analytics' },
         { path: '/reports', icon: FileDown, label: 'Reports' },
         { path: '/import', icon: Upload, label: 'Import Data' },
+        { path: '/stock', icon: ShoppingBag, label: 'Stock Management' },
         { path: '/online-store', icon: ShoppingBag, label: 'Online Store' },
         { path: '/ai', icon: Cpu, label: 'AI Studio' },
     ];
@@ -69,10 +71,13 @@ export default function Layout({ setAuth }: LayoutProps) {
         return (
             <Link
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive
+                className={`flex items-center rounded-lg transition-all justify-center ${
+                    isCollapsed ? 'p-2' : 'gap-3 px-4 py-3'
+                } ${isActive
                         ? 'bg-primary-100 text-primary-700 font-medium shadow-sm'
                         : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
                     }`}
+                title={isCollapsed ? item.label : ''}
                 onClick={() => isMobile && setIsSidebarOpen(false)}
             >
                 <Icon size={20} />
@@ -96,17 +101,17 @@ export default function Layout({ setAuth }: LayoutProps) {
                 className={`flex flex-col bg-white border-r border-neutral-200 shadow-sm transition-all duration-300 ${isMobile
                         ? 'fixed left-0 top-0 h-full z-40'
                         : ''
-                    } ${isSidebarOpen ? 'w-64' : 'w-20'
+                    } ${isSidebarOpen ? 'w-64' : isCollapsed ? 'w-16' : 'w-20'
                     } ${isMobile && !isSidebarOpen ? '-translate-x-full' : ''
                     }`}
             >
                 {/* Header */}
-                <div className="p-4 border-b border-neutral-200">
+                <div className={`border-b border-neutral-200 transition-all ${isCollapsed ? 'p-2' : 'p-4'}`}>
                     <div className="flex items-center justify-between">
                         {!isCollapsed && (
                             <div>
-                                <h1 className="text-xl font-bold text-primary-600">CRM Pro</h1>
-                                <p className="text-xs text-neutral-500">Retail Edition</p>
+                                <h1 className="text-xl font-bold bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent">AstroCRM</h1>
+                                <p className="text-xs text-neutral-500">Retail Edition v3.0</p>
                             </div>
                         )}
                         {isMobile && (
@@ -121,17 +126,20 @@ export default function Layout({ setAuth }: LayoutProps) {
                 </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 overflow-y-auto p-3 space-y-2">
+                <nav className={`flex-1 overflow-y-auto transition-all ${isCollapsed ? 'p-1 space-y-1' : 'p-3 space-y-2'}`}>
                     {navItems.map((item) => (
                         <NavLink key={item.path} item={item} />
                     ))}
                 </nav>
 
                 {/* Footer */}
-                <div className="p-3 border-t border-neutral-200 space-y-2">
+                <div className={`border-t border-neutral-200 transition-all ${isCollapsed ? 'p-1' : 'p-3'}`}>
                     <button
                         onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-neutral-600 hover:bg-danger-50 hover:text-danger-600 transition-all"
+                        className={`w-full flex items-center rounded-lg text-neutral-600 hover:bg-danger-50 hover:text-danger-600 transition-all ${
+                            isCollapsed ? 'p-2 justify-center' : 'gap-3 px-4 py-3'
+                        }`}
+                        title={isCollapsed ? 'Logout' : ''}
                     >
                         <LogOut size={20} />
                         {!isCollapsed && <span>Logout</span>}
@@ -164,7 +172,10 @@ export default function Layout({ setAuth }: LayoutProps) {
                             {navItems.find(item => item.path === location.pathname)?.label || 'Dashboard'}
                         </h2>
                     </div>
-                    <div className="text-sm text-neutral-500">v3.0.0</div>
+                    <div className="text-sm text-neutral-500 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-success-500 rounded-full animate-pulse" />
+                        AstroCRM v3.0.0
+                    </div>
                 </div>
 
                 {/* Page Content */}
