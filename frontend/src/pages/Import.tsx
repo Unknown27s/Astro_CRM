@@ -18,6 +18,8 @@ export default function Import() {
     const [result, setResult] = useState<any>(null);
     const [dragActive, setDragActive] = useState(false);
     const [stockDragActive, setStockDragActive] = useState(false);
+    const [stockImporting, setStockImporting] = useState(false);
+    const [stockResult, setStockResult] = useState<any>(null);
 
     // Google Sheets state
     const [sheetId, setSheetId] = useState('');
@@ -96,6 +98,43 @@ export default function Import() {
             toast.error('Error importing data');
         } finally {
             setImporting(false);
+        }
+    };
+
+    const handleImportProducts = async () => {
+        if (!stockFile) return;
+
+        setStockImporting(true);
+        const formData = new FormData();
+        formData.append('file', stockFile);
+        formData.append('importType', 'products');
+
+        // Default field mapping for products
+        const productMapping = {
+            name: 'name',
+            sku: 'sku',
+            barcode: 'barcode',
+            category: 'category',
+            description: 'description',
+            selling_price: 'selling_price',
+            cost_price: 'cost_price',
+            current_stock: 'current_stock',
+            min_stock_level: 'min_stock_level',
+            max_stock_level: 'max_stock_level',
+            supplier: 'supplier'
+        };
+        formData.append('fieldMapping', JSON.stringify(productMapping));
+
+        try {
+            const response = await importData.execute(formData);
+            setStockResult(response.data);
+            toast.success('Products imported successfully!');
+            setStockFile(null);
+        } catch (error: any) {
+            console.error('Error importing products:', error);
+            toast.error(error.response?.data?.error || 'Error importing products');
+        } finally {
+            setStockImporting(false);
         }
     };
 
@@ -601,11 +640,11 @@ export default function Import() {
                                     <strong>📦 How Product Import Works:</strong>
                                 </p>
                                 <ul className="text-sm text-primary-800 mt-2 space-y-1 ml-4 list-disc">
-                                    <li><strong>Match by SKU or Barcode:</strong> If product exists, stock quantity is updated</li>
-                                    <li><strong>Create New:</strong> If product doesn't exist, it's created with initial stock</li>
-                                    <li><strong>Auto-Reflects:</strong> Changes automatically sync to online store and inventory</li>
+                                    <li><strong>Match by SKU or Barcode:</strong> If product exists with same SKU/barcode, it's updated with new stock levels</li>
+                                    <li><strong>Create New:</strong> If product doesn't exist, it's created with the provided data</li>
+                                    <li><strong>Auto-Reflects:</strong> Imported products immediately appear in Stock Management page</li>
                                     <li><strong>Bulk Updates:</strong> Update 100s of products at once from Excel/CSV</li>
-                                    <li><strong>Columns needed:</strong> name, sku, barcode, category, current_stock, selling_price</li>
+                                    <li><strong>Columns needed:</strong> name, sku, barcode (at least one), category, current_stock, selling_price, cost_price</li>
                                 </ul>
                             </div>
 
@@ -641,46 +680,24 @@ export default function Import() {
 
                             {stockFile && (
                                 <Button
-                                    onClick={() => {
-                                        try {
-                                            const reader = new FileReader();
-                                            reader.onload = (e) => {
-                                                const text = e.target?.result as string;
-                                                const lines = text.trim().split('\n');
-                                                const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-
-                                                // Extract barcode column
-                                                const barcodeIdx = headers.indexOf('barcode');
-                                                const qtyIdx = headers.indexOf('quantity_change');
-
-                                                if (barcodeIdx === -1 || qtyIdx === -1) {
-                                                    toast.error('Missing required columns: barcode, quantity_change');
-                                                    return;
-                                                }
-
-                                                // Process stock updates
-                                                let processed = 0;
-                                                for (let i = 1; i < lines.length; i++) {
-                                                    const values = lines[i].split(',').map(v => v.trim());
-                                                    if (values[barcodeIdx]) {
-                                                        processed++;
-                                                    }
-                                                }
-
-                                                toast.success(`Stock ready to import: ${processed} items`);
-                                            };
-                                            reader.readAsText(stockFile);
-                                        } catch (error) {
-                                            toast.error('Error processing file');
-                                        }
-                                    }}
+                                    onClick={handleImportProducts}
+                                    disabled={stockImporting}
                                     variant="default"
                                     size="lg"
                                     fullWidth
                                     className="gap-2"
                                 >
-                                    <FileSpreadsheet size={20} />
-                                    Process Stock File
+                                    {stockImporting ? (
+                                        <>
+                                            <Loader2 size={20} className="animate-spin" />
+                                            Importing Products...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FileSpreadsheet size={20} />
+                                            Import Products
+                                        </>
+                                    )}
                                 </Button>
                             )}
 
@@ -702,6 +719,75 @@ export default function Import() {
                             >
                                 Download Sample Stock File
                             </Button>
+
+                            {/* Stock Import Result */}
+                            {stockResult && (
+                                <Card
+                                    className={`border-2 ${stockResult.errors?.length > 0 ? 'border-warning-200 bg-warning-50' : 'border-success-200 bg-success-50'
+                                        }`}
+                                >
+                                    <CardContent className="p-6">
+                                        <div className="flex gap-4">
+                                            <div>
+                                                {stockResult.errors?.length > 0 ? (
+                                                    <AlertCircle className="text-warning-600" size={32} />
+                                                ) : (
+                                                    <CheckCircle className="text-success-600" size={32} />
+                                                )}
+                                            </div>
+                                            <div className="flex-1">
+                                                <h2 className="text-xl font-bold text-neutral-900 mb-2">Product Import Complete</h2>
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-4">
+                                                        <Badge variant="success">
+                                                            {stockResult.imported} Created/Updated
+                                                        </Badge>
+                                                        <Badge variant="secondary">
+                                                            {stockResult.total} Total
+                                                        </Badge>
+                                                        {stockResult.skipped > 0 && (
+                                                            <Badge variant="warning">
+                                                                {stockResult.skipped} Skipped
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+
+                                                    {stockResult.errors?.length > 0 && (
+                                                        <div className="mt-4 p-4 bg-warning-100 border border-warning-300 rounded-lg">
+                                                            <p className="font-semibold text-warning-900 mb-2">
+                                                                {stockResult.errors.length} errors occurred:
+                                                            </p>
+                                                            <ul className="text-sm text-warning-800 space-y-1">
+                                                                {stockResult.errors.slice(0, 5).map((err: any, index: number) => (
+                                                                    <li key={index}>
+                                                                        • Row {err.row}: {err.error}
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                            {stockResult.errors.length > 5 && (
+                                                                <p className="text-xs text-warning-700 mt-2">
+                                                                    ... and {stockResult.errors.length - 5} more errors
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <Button
+                                                    onClick={() => {
+                                                        setStockFile(null);
+                                                        setStockResult(null);
+                                                    }}
+                                                    variant="outline"
+                                                    className="mt-4"
+                                                >
+                                                    Import Another File
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
                         </CardContent>
                     </Card>
                 </div>

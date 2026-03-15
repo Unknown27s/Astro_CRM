@@ -36,12 +36,18 @@ export default function Customers() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<'single' | 'bulk' | null>(null);
 
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(0);
+    const [totalCustomers, setTotalCustomers] = useState(0);
+    const itemsPerPage = 50;
+
     const [newCustomer, setNewCustomer] = useState({
         name: '',
         phone: '',
         email: '',
         location: '',
         notes: '',
+        customer_type: 'buyer',
     });
 
     const [editForm, setEditForm] = useState({
@@ -51,6 +57,7 @@ export default function Customers() {
         location: '',
         notes: '',
         status: 'Active',
+        customer_type: 'buyer',
     });
 
     const [newPurchase, setNewPurchase] = useState({
@@ -61,14 +68,23 @@ export default function Customers() {
     });
 
     useEffect(() => {
-        fetchCustomers();
+        setCurrentPage(0);
+        fetchCustomers(0);
     }, [statusFilter]);
 
-    const fetchCustomers = async () => {
+    const fetchCustomers = async (page: number = 0) => {
         setListLoading(true);
         try {
-            const response = await customers.getAll({ search: searchTerm, status: statusFilter });
+            const offset = page * itemsPerPage;
+            const response = await customers.getAll({
+                search: searchTerm,
+                status: statusFilter,
+                limit: itemsPerPage,
+                offset: offset
+            });
             setCustomerList(response.data.customers || []);
+            setTotalCustomers(response.data.total || 0);
+            setCurrentPage(page);
         } catch (error) {
             console.error('Error fetching customers:', error);
             toast.error('Failed to load customers');
@@ -98,7 +114,7 @@ export default function Customers() {
         try {
             await customers.create(newCustomer);
             setShowAddCustomer(false);
-            setNewCustomer({ name: '', phone: '', email: '', location: '', notes: '' });
+            setNewCustomer({ name: '', phone: '', email: '', location: '', notes: '', customer_type: 'buyer' });
             await fetchCustomers();
             toast.success('Customer added successfully');
         } catch (error: any) {
@@ -116,6 +132,7 @@ export default function Customers() {
             location: customer.location || '',
             notes: customer.notes || '',
             status: customer.status || 'Active',
+            customer_type: customer.customer_type || 'buyer',
         });
         setShowEditCustomer(true);
     };
@@ -296,7 +313,7 @@ export default function Customers() {
                                 placeholder="Search customers by name..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && fetchCustomers()}
+                                onKeyPress={(e) => e.key === 'Enter' && fetchCustomers(0)}
                                 className="pl-10"
                             />
                         </div>
@@ -310,7 +327,7 @@ export default function Customers() {
                             <option value="VIP">VIP</option>
                             <option value="Inactive">Inactive</option>
                         </select>
-                        <Button onClick={fetchCustomers} variant="outline">
+                        <Button onClick={() => fetchCustomers(currentPage)} variant="outline">
                             <Search size={20} />
                         </Button>
                     </div>
@@ -414,6 +431,32 @@ export default function Customers() {
                                 <EmptyState title="No customers found" description="Add a new customer to get started" />
                             )}
                         </CardContent>
+                        {/* Pagination */}
+                        {customerList.length > 0 && totalCustomers > itemsPerPage && (
+                            <div className="border-t border-neutral-200 px-6 py-3 flex items-center justify-between bg-neutral-50">
+                                <div className="text-sm text-neutral-600">
+                                    Showing {currentPage * itemsPerPage + 1} to {Math.min((currentPage + 1) * itemsPerPage, totalCustomers)} of {totalCustomers} customers
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => fetchCustomers(currentPage - 1)}
+                                        disabled={currentPage === 0}
+                                    >
+                                        Previous
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => fetchCustomers(currentPage + 1)}
+                                        disabled={(currentPage + 1) * itemsPerPage >= totalCustomers}
+                                    >
+                                        Next
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                     </Card>
                 </div>
 
@@ -649,6 +692,19 @@ export default function Customers() {
                         />
                     </div>
                     <div>
+                        <Label htmlFor="customer-type">Customer Type</Label>
+                        <select
+                            id="customer-type"
+                            value={newCustomer.customer_type}
+                            onChange={(e) => setNewCustomer({ ...newCustomer, customer_type: e.target.value })}
+                            className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                        >
+                            <option value="buyer">Buyer</option>
+                            <option value="seller">Seller/Vendor</option>
+                            <option value="both">Both Buyer & Seller</option>
+                        </select>
+                    </div>
+                    <div>
                         <Label htmlFor="notes">Notes</Label>
                         <textarea
                             id="notes"
@@ -725,6 +781,19 @@ export default function Customers() {
                             <option value="Active">Active</option>
                             <option value="VIP">VIP</option>
                             <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-customer-type">Customer Type</Label>
+                        <select
+                            id="edit-customer-type"
+                            value={editForm.customer_type}
+                            onChange={(e) => setEditForm({ ...editForm, customer_type: e.target.value })}
+                            className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                        >
+                            <option value="buyer">Buyer</option>
+                            <option value="seller">Seller/Vendor</option>
+                            <option value="both">Both Buyer & Seller</option>
                         </select>
                     </div>
                     <div>
