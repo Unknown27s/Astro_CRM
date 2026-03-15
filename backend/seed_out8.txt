@@ -1,0 +1,6 @@
+﻿Starting sample data generation...
+Inserted 10 products.
+Inserted 20 customers.
+Inserted 100 transactions.
+Customer revenue fields updated.
+Excel file saved to D:\Harish Kumar\Project\ASTRO_CRMV3\Astro_CRM\sample-data\antigravity-sample-data.xlsx

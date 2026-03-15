@@ -14,6 +14,7 @@ import {
     Menu,
     X,
     ChevronDown,
+    CalendarCheck,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -34,7 +35,7 @@ export default function Layout({ setAuth }: LayoutProps) {
             setIsMobile(mobile);
             if (mobile) {
                 setIsSidebarOpen(false);
-                setIsCollapsed(smallMobile); // Collapse on very small screens (< 600px)
+                setIsCollapsed(smallMobile); // Collapse on very small screens (<600px)
             } else {
                 setIsSidebarOpen(true);
                 setIsCollapsed(window.innerWidth < 1024);
@@ -54,6 +55,7 @@ export default function Layout({ setAuth }: LayoutProps) {
     const navItems = [
         { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
         { path: '/customers', icon: Users, label: 'Customers' },
+        { path: '/activities', icon: CalendarCheck, label: 'Activities' },
         { path: '/campaigns', icon: Send, label: 'Campaigns' },
         { path: '/insights', icon: BarChart3, label: 'Insights' },
         { path: '/analytics', icon: Sparkles, label: 'ML Analytics' },

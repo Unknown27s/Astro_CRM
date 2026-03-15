@@ -209,6 +209,27 @@ CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 CREATE INDEX IF NOT EXISTS idx_inventory_tx_product ON inventory_transactions(product_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_sends_campaign ON campaign_sends(campaign_id);
 
+-- Activities/Tasks (CRM interaction tracking)
+CREATE TABLE IF NOT EXISTS activities (
+    id SERIAL PRIMARY KEY,
+    customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id),
+    type VARCHAR(50) NOT NULL DEFAULT 'note',
+    subject VARCHAR(255) NOT NULL,
+    description TEXT,
+    due_date TIMESTAMP,
+    completed BOOLEAN DEFAULT FALSE,
+    completed_at TIMESTAMP,
+    priority VARCHAR(20) DEFAULT 'medium',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_activities_customer ON activities(customer_id);
+CREATE INDEX IF NOT EXISTS idx_activities_type ON activities(type);
+CREATE INDEX IF NOT EXISTS idx_activities_due_date ON activities(due_date);
+CREATE INDEX IF NOT EXISTS idx_activities_completed ON activities(completed);
+
 -- Seed default store settings if empty
 INSERT INTO store_settings (id, store_name) VALUES (1, 'AstroCRM Store')
 ON CONFLICT (id) DO NOTHING;

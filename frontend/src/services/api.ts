@@ -171,6 +171,18 @@ export const aiService = {
         api.post('/ai/report-summary', data || {}),
 };
 
+// Activities (CRM interaction tracking)
+export const activities = {
+    getAll: (params?: any) => api.get('/activities', { params }),
+    getByCustomer: (customerId: number) => api.get(`/activities/customer/${customerId}`),
+    getUpcoming: () => api.get('/activities/upcoming'),
+    create: (data: any) => api.post('/activities', data),
+    update: (id: number, data: any) => api.put(`/activities/${id}`, data),
+    toggleComplete: (id: number) => api.patch(`/activities/${id}/complete`),
+    delete: (id: number) => api.delete(`/activities/${id}`),
+    getStats: () => api.get('/activities/stats'),
+};
+
 // Public shop (no auth needed — uses base axios without interceptor)
 const publicApi = axios.create({ baseURL: API_BASE_URL });
 export const publicShop = {

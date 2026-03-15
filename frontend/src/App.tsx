@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Customers from './pages/Customers';
 import Campaigns from './pages/Campaigns';
+import Activities from './pages/Activities';
 import Insights from './pages/Insights';
 import Import from './pages/Import';
 import Login from './pages/Login';
@@ -47,6 +48,7 @@ function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="customers" element={<Customers />} />
+          <Route path="activities" element={<Activities />} />
           <Route path="campaigns" element={<Campaigns />} />
           <Route path="insights" element={<Insights />} />
           <Route path="import" element={<Import />} />
