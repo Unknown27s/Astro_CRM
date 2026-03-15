@@ -1,7 +1,25 @@
 import { useState, useEffect } from 'react';
 import { customers, purchases } from '../services/api';
 import toast from 'react-hot-toast';
-import { Users, Phone, Mail, MapPin, ShoppingBag, Plus, Search, Filter, DollarSign, Edit2 } from 'lucide-react';
+import {
+    Users,
+    Phone,
+    Mail,
+    MapPin,
+    ShoppingBag,
+    Plus,
+    Search,
+    TrendingUp,
+    Edit2,
+    Trash2,
+} from 'lucide-react';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Label } from '../components/ui/Label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
+import { Badge } from '../components/ui/Badge';
+import { Modal } from '../components/ui/Modal';
+import { Spinner, EmptyState } from '../components/ui/Avatar';
 
 export default function Customers() {
     const [customerList, setCustomerList] = useState<any[]>([]);
@@ -13,13 +31,23 @@ export default function Customers() {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [loading, setLoading] = useState(false);
-    
+    const [listLoading, setListLoading] = useState(true);
+    const [selectedForDelete, setSelectedForDelete] = useState<Set<number>>(new Set()); // Bulk delete
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<'single' | 'bulk' | null>(null);
+
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(0);
+    const [totalCustomers, setTotalCustomers] = useState(0);
+    const itemsPerPage = 50;
+
     const [newCustomer, setNewCustomer] = useState({
         name: '',
         phone: '',
         email: '',
         location: '',
-        notes: ''
+        notes: '',
+        customer_type: 'buyer',
     });
 
     const [editForm, setEditForm] = useState({
@@ -28,26 +56,40 @@ export default function Customers() {
         email: '',
         location: '',
         notes: '',
-        status: 'Active'
+        status: 'Active',
+        customer_type: 'buyer',
     });
 
     const [newPurchase, setNewPurchase] = useState({
         items: [{ name: '', qty: 1, price: 0 }],
         payment_method: 'Cash',
         purchase_date: new Date().toISOString().split('T')[0],
-        notes: ''
+        notes: '',
     });
 
     useEffect(() => {
-        fetchCustomers();
+        setCurrentPage(0);
+        fetchCustomers(0);
     }, [statusFilter]);
 
-    const fetchCustomers = async () => {
+    const fetchCustomers = async (page: number = 0) => {
+        setListLoading(true);
         try {
-            const response = await customers.getAll({ search: searchTerm, status: statusFilter });
+            const offset = page * itemsPerPage;
+            const response = await customers.getAll({
+                search: searchTerm,
+                status: statusFilter,
+                limit: itemsPerPage,
+                offset: offset
+            });
             setCustomerList(response.data.customers || []);
+            setTotalCustomers(response.data.total || 0);
+            setCurrentPage(page);
         } catch (error) {
             console.error('Error fetching customers:', error);
+            toast.error('Failed to load customers');
+        } finally {
+            setListLoading(false);
         }
     };
 
@@ -58,6 +100,7 @@ export default function Customers() {
             setCustomerPurchases(response.data.purchases || []);
         } catch (error) {
             console.error('Error fetching customer details:', error);
+            toast.error('Failed to load customer details');
         }
     };
 
@@ -71,8 +114,9 @@ export default function Customers() {
         try {
             await customers.create(newCustomer);
             setShowAddCustomer(false);
-            setNewCustomer({ name: '', phone: '', email: '', location: '', notes: '' });
-            fetchCustomers();
+            setNewCustomer({ name: '', phone: '', email: '', location: '', notes: '', customer_type: 'buyer' });
+            await fetchCustomers();
+            toast.success('Customer added successfully');
         } catch (error: any) {
             toast.error(error.response?.data?.error || 'Error adding customer');
         } finally {
@@ -87,7 +131,8 @@ export default function Customers() {
             email: customer.email || '',
             location: customer.location || '',
             notes: customer.notes || '',
-            status: customer.status || 'Active'
+            status: customer.status || 'Active',
+            customer_type: customer.customer_type || 'buyer',
         });
         setShowEditCustomer(true);
     };
@@ -103,15 +148,74 @@ export default function Customers() {
         try {
             await customers.update(selectedCustomer.id, editForm);
             setShowEditCustomer(false);
-            toast.success('Customer updated successfully');
-            fetchCustomers();
-            // Refresh the selected customer
+            await fetchCustomers();
             const updated = { ...selectedCustomer, ...editForm };
             setSelectedCustomer(updated);
+            toast.success('Customer updated successfully');
         } catch (error: any) {
             toast.error(error.response?.data?.error || 'Error updating customer');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDeleteCustomer = async (customerId: number) => {
+        setLoading(true);
+        try {
+            await customers.delete(customerId);
+            if (selectedCustomer?.id === customerId) {
+                setSelectedCustomer(null);
+            }
+            await fetchCustomers();
+            toast.success('Customer deleted successfully');
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || 'Error deleting customer');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        setLoading(true);
+        try {
+            const ids = Array.from(selectedForDelete);
+            for (const id of ids) {
+                try {
+                    await customers.delete(id);
+                } catch (error) {
+                    console.error(`Error deleting customer ${id}:`, error);
+                }
+            }
+            setSelectedForDelete(new Set());
+            setShowDeleteConfirm(false);
+            setDeleteTarget(null);
+            if (selectedCustomer && selectedForDelete.has(selectedCustomer.id)) {
+                setSelectedCustomer(null);
+            }
+            await fetchCustomers();
+            toast.success(`${ids.length} customer(s) deleted successfully`);
+        } catch (error: any) {
+            toast.error('Error deleting customers');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleSelectForDelete = (customerId: number) => {
+        const newSet = new Set(selectedForDelete);
+        if (newSet.has(customerId)) {
+            newSet.delete(customerId);
+        } else {
+            newSet.add(customerId);
+        }
+        setSelectedForDelete(newSet);
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedForDelete.size === customerList.length) {
+            setSelectedForDelete(new Set());
+        } else {
+            setSelectedForDelete(new Set(customerList.map((c) => c.id)));
         }
     };
 
@@ -124,7 +228,7 @@ export default function Customers() {
             return;
         }
 
-        const totalAmount = validItems.reduce((sum, item) => sum + (item.qty * item.price), 0);
+        const totalAmount = validItems.reduce((sum, item) => sum + item.qty * item.price, 0);
 
         setLoading(true);
         try {
@@ -134,17 +238,18 @@ export default function Customers() {
                 total_amount: totalAmount,
                 payment_method: newPurchase.payment_method,
                 purchase_date: newPurchase.purchase_date,
-                notes: newPurchase.notes
+                notes: newPurchase.notes,
             });
             setShowAddPurchase(false);
             setNewPurchase({
                 items: [{ name: '', qty: 1, price: 0 }],
                 payment_method: 'Cash',
                 purchase_date: new Date().toISOString().split('T')[0],
-                notes: ''
+                notes: '',
             });
-            handleSelectCustomer(selectedCustomer);
-            fetchCustomers();
+            await handleSelectCustomer(selectedCustomer);
+            await fetchCustomers();
+            toast.success('Purchase added successfully');
         } catch (error: any) {
             toast.error(error.response?.data?.error || 'Error adding purchase');
         } finally {
@@ -155,7 +260,7 @@ export default function Customers() {
     const addPurchaseItem = () => {
         setNewPurchase({
             ...newPurchase,
-            items: [...newPurchase.items, { name: '', qty: 1, price: 0 }]
+            items: [...newPurchase.items, { name: '', qty: 1, price: 0 }],
         });
     };
 
@@ -170,435 +275,633 @@ export default function Customers() {
         setNewPurchase({ ...newPurchase, items: updated });
     };
 
-    const getStatusColor = (status: string) => {
+    const getStatusBadgeVariant = (status: string) => {
         switch (status) {
-            case 'VIP': return 'bg-purple-100 text-purple-800';
-            case 'Active': return 'bg-green-100 text-green-800';
-            case 'Inactive': return 'bg-gray-100 text-gray-800';
-            default: return 'bg-gray-100 text-gray-800';
+            case 'VIP':
+                return 'default';
+            case 'Active':
+                return 'success';
+            case 'Inactive':
+                return 'secondary';
+            default:
+                return 'secondary';
         }
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
+        <div className="space-y-6 animate-fade-in">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-800">Customers</h1>
-                    <p className="text-gray-600 mt-1">Manage customer profiles and purchase history</p>
+                    <h1 className="text-3xl font-bold text-neutral-900">Customers</h1>
+                    <p className="text-neutral-500 mt-1">Manage customer profiles and purchase history</p>
                 </div>
-                <button
-                    onClick={() => setShowAddCustomer(true)}
-                    className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all"
-                >
+                <Button onClick={() => setShowAddCustomer(true)} size="lg" className="gap-2">
                     <Plus size={20} />
                     Add Customer
-                </button>
+                </Button>
             </div>
 
             {/* Search and Filter */}
-            <div className="bg-white rounded-xl shadow-md p-4 flex gap-4">
-                <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                    <input
-                        type="text"
-                        placeholder="Search customers..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && fetchCustomers()}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                </div>
-                <div className="flex items-center gap-2">
-                    <Filter size={20} className="text-gray-400" />
-                    <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                    >
-                        <option value="">All Status</option>
-                        <option value="Active">Active</option>
-                        <option value="VIP">VIP</option>
-                        <option value="Inactive">Inactive</option>
-                    </select>
-                </div>
-                <button
-                    onClick={fetchCustomers}
-                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                >
-                    Search
-                </button>
-            </div>
+            <Card>
+                <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row gap-4">
+                        <div className="flex-1 relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" size={20} />
+                            <Input
+                                type="text"
+                                placeholder="Search customers by name..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && fetchCustomers(0)}
+                                className="pl-10"
+                            />
+                        </div>
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                        >
+                            <option value="">All Status</option>
+                            <option value="Active">Active</option>
+                            <option value="VIP">VIP</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                        <Button onClick={() => fetchCustomers(currentPage)} variant="outline">
+                            <Search size={20} />
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
 
-            <div className="grid grid-cols-3 gap-6">
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Customer List */}
-                <div className="bg-white rounded-xl shadow-md p-6">
-                    <h2 className="text-xl font-bold text-gray-800 mb-4">Customer List</h2>
-                    <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                        {customerList.map((customer) => (
-                            <div
-                                key={customer.id}
-                                onClick={() => handleSelectCustomer(customer)}
-                                className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                                    selectedCustomer?.id === customer.id
-                                        ? 'border-indigo-500 bg-indigo-50'
-                                        : 'border-gray-200 hover:border-indigo-300'
-                                }`}
-                            >
-                                <div className="flex justify-between items-start mb-2">
-                                    <h3 className="font-semibold text-gray-800">{customer.name}</h3>
-                                    <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(customer.status)}`}>
-                                        {customer.status}
-                                    </span>
+                <div>
+                    <Card className="h-full">
+                        <CardHeader>
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <CardTitle className="text-lg">Customer List</CardTitle>
+                                    <CardDescription>{customerList.length} customers</CardDescription>
                                 </div>
-                                <div className="space-y-1 text-sm text-gray-600">
-                                    {customer.phone && (
-                                        <div className="flex items-center gap-2">
-                                            <Phone size={14} />
-                                            {customer.phone}
-                                        </div>
+                                {selectedForDelete.size > 0 && (
+                                    <Button
+                                        variant="danger"
+                                        size="sm"
+                                        onClick={() => {
+                                            setDeleteTarget('bulk');
+                                            setShowDeleteConfirm(true);
+                                        }}
+                                    >
+                                        <Trash2 size={16} className="mr-1" />
+                                        Delete ({selectedForDelete.size})
+                                    </Button>
+                                )}
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            {listLoading ? (
+                                <div className="flex justify-center py-8">
+                                    <Spinner size="md" />
+                                </div>
+                            ) : customerList.length > 0 ? (
+                                <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                                    {selectedForDelete.size > 0 && (
+                                        <button
+                                            onClick={toggleSelectAll}
+                                            className="w-full text-left p-3 rounded-lg border-2 border-primary-300 bg-primary-50 flex items-center gap-2 mb-2"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedForDelete.size === customerList.length}
+                                                onChange={toggleSelectAll}
+                                                className="w-4 h-4"
+                                            />
+                                            <span className="text-sm font-medium">
+                                                {selectedForDelete.size === customerList.length ? 'Deselect All' : 'Select All'}
+                                            </span>
+                                        </button>
                                     )}
-                                    {customer.location && (
-                                        <div className="flex items-center gap-2">
-                                            <MapPin size={14} />
-                                            {customer.location}
+                                    {customerList.map((customer) => (
+                                        <div key={customer.id} className="flex gap-2 items-center">
+                                            {selectedForDelete.size > 0 && (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedForDelete.has(customer.id)}
+                                                    onChange={() => toggleSelectForDelete(customer.id)}
+                                                    className="w-4 h-4 rounded"
+                                                />
+                                            )}
+                                            <button
+                                                onClick={() => handleSelectCustomer(customer)}
+                                                className={`flex-1 text-left p-3 rounded-lg border-2 transition-all ${selectedCustomer?.id === customer.id
+                                                        ? 'border-primary-500 bg-primary-50'
+                                                        : 'border-neutral-200 hover:border-primary-300 hover:bg-neutral-50'
+                                                    }`}
+                                            >
+                                                <div className="flex justify-between items-start gap-2 mb-1">
+                                                    <h3 className="font-semibold text-neutral-900 truncate">{customer.name}</h3>
+                                                    <Badge variant={getStatusBadgeVariant(customer.status)} className="text-xs whitespace-nowrap">
+                                                        {customer.status}
+                                                    </Badge>
+                                                </div>
+                                                <p className="text-xs text-neutral-500 truncate">{customer.email || customer.phone}</p>
+                                                <div className="text-sm font-medium text-success-600 mt-1">
+                                                    ₹{customer.total_spent?.toFixed(0) || '0'}
+                                                </div>
+                                            </button>
+                                            {!selectedForDelete.has(customer.id) && (
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedCustomer(customer);
+                                                        setDeleteTarget('single');
+                                                        setShowDeleteConfirm(true);
+                                                    }}
+                                                    className="p-2 hover:bg-danger-50 hover:text-danger-600 rounded-lg transition-all"
+                                                    title="Delete customer"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            )}
                                         </div>
-                                    )}
-                                    <div className="flex items-center gap-2 font-medium text-green-600">
-                                        <DollarSign size={14} />
-                                        ₹{customer.total_spent?.toFixed(2) || '0'} ({customer.total_purchases || 0} purchases)
-                                    </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <EmptyState title="No customers found" description="Add a new customer to get started" />
+                            )}
+                        </CardContent>
+                        {/* Pagination */}
+                        {customerList.length > 0 && totalCustomers > itemsPerPage && (
+                            <div className="border-t border-neutral-200 px-6 py-3 flex items-center justify-between bg-neutral-50">
+                                <div className="text-sm text-neutral-600">
+                                    Showing {currentPage * itemsPerPage + 1} to {Math.min((currentPage + 1) * itemsPerPage, totalCustomers)} of {totalCustomers} customers
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => fetchCustomers(currentPage - 1)}
+                                        disabled={currentPage === 0}
+                                    >
+                                        Previous
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => fetchCustomers(currentPage + 1)}
+                                        disabled={(currentPage + 1) * itemsPerPage >= totalCustomers}
+                                    >
+                                        Next
+                                    </Button>
                                 </div>
                             </div>
-                        ))}
-                    </div>
+                        )}
+                    </Card>
                 </div>
 
                 {/* Customer Details */}
-                <div className="col-span-2 bg-white rounded-xl shadow-md p-6">
-                    {selectedCustomer ? (
-                        <div>
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    <h2 className="text-2xl font-bold text-gray-800">{selectedCustomer.name}</h2>
-                                    <span className={`inline-block mt-2 text-sm px-3 py-1 rounded-full ${getStatusColor(selectedCustomer.status)}`}>
-                                        {selectedCustomer.status}
-                                    </span>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => openEditCustomer(selectedCustomer)}
-                                        className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
-                                    >
-                                        <Edit2 size={18} />
-                                        Edit
-                                    </button>
-                                    <button
-                                        onClick={() => setShowAddPurchase(true)}
-                                        className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                                    >
-                                        <Plus size={18} />
-                                        Add Purchase
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4 mb-6">
-                                {selectedCustomer.phone && (
-                                    <div className="flex items-center gap-3">
-                                        <Phone className="text-indigo-600" size={20} />
-                                        <div>
-                                            <p className="text-sm text-gray-500">Phone</p>
-                                            <p className="font-medium">{selectedCustomer.phone}</p>
+                <div className="lg:col-span-2">
+                    <Card className="h-full">
+                        {selectedCustomer ? (
+                            <>
+                                <CardHeader>
+                                    <div className="flex justify-between items-start gap-4">
+                                        <div className="flex-1">
+                                            <CardTitle>{selectedCustomer.name}</CardTitle>
+                                            <CardDescription>Customer ID: {selectedCustomer.id}</CardDescription>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => openEditCustomer(selectedCustomer)}
+                                                className="gap-2"
+                                            >
+                                                <Edit2 size={16} />
+                                                Edit
+                                            </Button>
+                                            <Button
+                                                variant="default"
+                                                size="sm"
+                                                onClick={() => setShowAddPurchase(true)}
+                                                className="gap-2"
+                                            >
+                                                <Plus size={16} />
+                                                Purchase
+                                            </Button>
+                                            <Button
+                                                variant="danger"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setDeleteTarget('single');
+                                                    setShowDeleteConfirm(true);
+                                                }}
+                                                className="gap-2"
+                                            >
+                                                <Trash2 size={16} />
+                                                Delete
+                                            </Button>
                                         </div>
                                     </div>
-                                )}
-                                {selectedCustomer.email && (
-                                    <div className="flex items-center gap-3">
-                                        <Mail className="text-indigo-600" size={20} />
-                                        <div>
-                                            <p className="text-sm text-gray-500">Email</p>
-                                            <p className="font-medium">{selectedCustomer.email}</p>
-                                        </div>
-                                    </div>
-                                )}
-                                {selectedCustomer.location && (
-                                    <div className="flex items-center gap-3">
-                                        <MapPin className="text-indigo-600" size={20} />
-                                        <div>
-                                            <p className="text-sm text-gray-500">Location</p>
-                                            <p className="font-medium">{selectedCustomer.location}</p>
-                                        </div>
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-3">
-                                    <ShoppingBag className="text-indigo-600" size={20} />
+                                </CardHeader>
+                                <CardContent className="space-y-6">
+                                    {/* Contact Info */}
                                     <div>
-                                        <p className="text-sm text-gray-500">Total Purchases</p>
-                                        <p className="font-medium">{selectedCustomer.total_purchases || 0}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 mb-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-gray-600">Total Spent</p>
-                                        <p className="text-3xl font-bold text-green-600">
-                                            ₹{selectedCustomer.total_spent?.toFixed(2) || '0'}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-gray-600">Last Purchase</p>
-                                        <p className="text-lg font-medium text-gray-800">
-                                            {selectedCustomer.last_purchase_date || 'Never'}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <h3 className="text-xl font-bold text-gray-800 mb-4">Purchase History</h3>
-                            <div className="space-y-4 max-h-[400px] overflow-y-auto">
-                                {customerPurchases.length > 0 ? (
-                                    customerPurchases.map((purchase) => (
-                                        <div key={purchase.id} className="border border-gray-200 rounded-lg p-4">
-                                            <div className="flex justify-between items-start mb-3">
-                                                <div>
-                                                    <p className="text-sm text-gray-500">{purchase.purchase_date}</p>
-                                                    <p className="text-lg font-bold text-green-600">
-                                                        ₹{purchase.total_amount.toFixed(2)}
-                                                    </p>
-                                                </div>
-                                                <span className="text-sm px-3 py-1 bg-blue-100 text-blue-800 rounded-full">
-                                                    {purchase.payment_method || 'Cash'}
-                                                </span>
-                                            </div>
-                                            <div className="space-y-2">
-                                                {JSON.parse(purchase.items || '[]').map((item: any, idx: number) => (
-                                                    <div key={idx} className="flex justify-between text-sm">
-                                                        <span>{item.name} × {item.qty}</span>
-                                                        <span className="font-medium">₹{(item.qty * item.price).toFixed(2)}</span>
+                                        <h3 className="text-sm font-semibold text-neutral-900 mb-3">Contact Information</h3>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {selectedCustomer.phone && (
+                                                <div className="flex items-start gap-3">
+                                                    <Phone className="text-primary-600 mt-0.5" size={18} />
+                                                    <div>
+                                                        <p className="text-xs text-neutral-500">Phone</p>
+                                                        <p className="font-medium text-neutral-900"> {selectedCustomer.phone}</p>
                                                     </div>
-                                                ))}
+                                                </div>
+                                            )}
+                                            {selectedCustomer.email && (
+                                                <div className="flex items-start gap-3">
+                                                    <Mail className="text-primary-600 mt-0.5" size={18} />
+                                                    <div>
+                                                        <p className="text-xs text-neutral-500">Email</p>
+                                                        <p className="font-medium text-neutral-900 truncate">{selectedCustomer.email}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {selectedCustomer.location && (
+                                                <div className="flex items-start gap-3">
+                                                    <MapPin className="text-primary-600 mt-0.5" size={18} />
+                                                    <div>
+                                                        <p className="text-xs text-neutral-500">Location</p>
+                                                        <p className="font-medium text-neutral-900">{selectedCustomer.location}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className="flex items-start gap-3">
+                                                <ShoppingBag className="text-primary-600 mt-0.5" size={18} />
+                                                <div>
+                                                    <p className="text-xs text-neutral-500">Purchases</p>
+                                                    <p className="font-medium text-neutral-900">{selectedCustomer.total_purchases || 0}</p>
+                                                </div>
                                             </div>
-                                            {purchase.notes && (
-                                                <p className="mt-2 text-sm text-gray-500 italic">{purchase.notes}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Stats */}
+                                    <div className="bg-gradient-to-r from-primary-50 to-primary-100 rounded-lg p-4 border border-primary-200">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <p className="text-xs text-neutral-600">Total Spent</p>
+                                                <p className="text-2xl font-bold text-primary-600">₹{selectedCustomer.total_spent?.toFixed(0) || '0'}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-neutral-600">Last Purchase</p>
+                                                <p className="text-lg font-medium text-neutral-900">{selectedCustomer.last_purchase_date || 'Never'}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Purchase History */}
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-neutral-900 mb-3 flex items-center gap-2">
+                                            <TrendingUp size={16} />
+                                            Purchase History & Breakdown
+                                        </h3>
+                                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                                            {customerPurchases.length > 0 ? (
+                                                customerPurchases.map((purchase: any) => {
+                                                    const items = JSON.parse(purchase.items || '[]');
+                                                    return (
+                                                        <div key={purchase.id} className="p-3 bg-gradient-to-br from-neutral-50 to-neutral-100 rounded-lg border border-neutral-200 hover:border-primary-300 transition-all">
+                                                            {/* Purchase Header */}
+                                                            <div className="flex justify-between items-start gap-2 mb-2">
+                                                                <div>
+                                                                    <p className="text-xs text-neutral-500">{purchase.purchase_date}</p>
+                                                                    <p className="font-bold text-success-600 text-sm">Total: ₹{purchase.total_amount.toFixed(2)}</p>
+                                                                </div>
+                                                                <Badge variant="secondary" className="text-xs">
+                                                                    {purchase.payment_method || 'Cash'}
+                                                                </Badge>
+                                                            </div>
+
+                                                            {/* Itemized Breakdown */}
+                                                            {items.length > 0 && (
+                                                                <div className="mt-2 pt-2 border-t border-neutral-300">
+                                                                    <div className="space-y-1 text-xs">
+                                                                        {items.map((item: any, idx: number) => {
+                                                                            const lineTotal = item.qty * item.price;
+                                                                            return (
+                                                                                <div key={idx} className="flex justify-between items-center gap-2 px-1">
+                                                                                    <span className="text-neutral-700 font-medium flex-1">
+                                                                                        {item.name} × {item.qty}
+                                                                                    </span>
+                                                                                    <span className="text-neutral-600">
+                                                                                        ₹{item.price.toFixed(0)}
+                                                                                    </span>
+                                                                                    <span className="text-neutral-900 font-semibold min-w-[60px] text-right">
+                                                                                        ₹{lineTotal.toFixed(2)}
+                                                                                    </span>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                    {purchase.notes && (
+                                                                        <p className="text-xs text-neutral-600 mt-2 italic">
+                                                                            Note: {purchase.notes}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })
+                                            ) : (
+                                                <p className="text-center text-neutral-500 py-4 text-sm">No purchases yet</p>
                                             )}
                                         </div>
-                                    ))
-                                ) : (
-                                    <p className="text-center text-gray-500 py-8">No purchases yet</p>
-                                )}
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                            <Users size={64} />
-                            <p className="mt-4 text-lg">Select a customer to view details</p>
-                        </div>
-                    )}
+                                    </div>
+                                </CardContent>
+                            </>
+                        ) : (
+                            <CardContent className="flex flex-col items-center justify-center h-96">
+                                <EmptyState
+                                    icon={<Users size={48} className="text-neutral-400" />}
+                                    title="Select a customer"
+                                    description="Choose a customer from the list to view details"
+                                />
+                            </CardContent>
+                        )}
+                    </Card>
                 </div>
             </div>
 
             {/* Add Customer Modal */}
-            {showAddCustomer && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl p-6 w-full max-w-md">
-                        <h2 className="text-2xl font-bold text-gray-800 mb-4">Add New Customer</h2>
-                        <div className="space-y-4">
-                            <input
-                                type="text"
-                                placeholder="Customer Name *"
-                                value={newCustomer.name}
-                                onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                            />
-                            <input
-                                type="tel"
-                                placeholder="Phone"
-                                value={newCustomer.phone}
-                                onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                            />
-                            <input
-                                type="email"
-                                placeholder="Email"
-                                value={newCustomer.email}
-                                onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                            />
-                            <input
-                                type="text"
-                                placeholder="Location"
-                                value={newCustomer.location}
-                                onChange={(e) => setNewCustomer({ ...newCustomer, location: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                            />
-                            <textarea
-                                placeholder="Notes"
-                                value={newCustomer.notes}
-                                onChange={(e) => setNewCustomer({ ...newCustomer, notes: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                                rows={3}
-                            />
-                        </div>
-                        <div className="flex gap-3 mt-6">
-                            <button
-                                onClick={() => setShowAddCustomer(false)}
-                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleAddCustomer}
-                                disabled={loading}
-                                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                            >
-                                {loading ? 'Adding...' : 'Add Customer'}
-                            </button>
-                        </div>
+            <Modal
+                isOpen={showAddCustomer}
+                onClose={() => setShowAddCustomer(false)}
+                title="Add New Customer"
+                size="md"
+                footer={
+                    <div className="flex gap-3 justify-end">
+                        <Button variant="secondary" onClick={() => setShowAddCustomer(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleAddCustomer} disabled={loading}>
+                            {loading ? 'Adding...' : 'Add Customer'}
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-4">
+                    <div>
+                        <Label htmlFor="name">Customer Name *</Label>
+                        <Input
+                            id="name"
+                            placeholder="John Doe"
+                            value={newCustomer.name}
+                            onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="phone">Phone</Label>
+                        <Input
+                            id="phone"
+                            type="tel"
+                            placeholder="+91 9876543210"
+                            value={newCustomer.phone}
+                            onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                            id="email"
+                            type="email"
+                            placeholder="john@example.com"
+                            value={newCustomer.email}
+                            onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="location">Location</Label>
+                        <Input
+                            id="location"
+                            placeholder="City, Country"
+                            value={newCustomer.location}
+                            onChange={(e) => setNewCustomer({ ...newCustomer, location: e.target.value })}
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="customer-type">Customer Type</Label>
+                        <select
+                            id="customer-type"
+                            value={newCustomer.customer_type}
+                            onChange={(e) => setNewCustomer({ ...newCustomer, customer_type: e.target.value })}
+                            className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                        >
+                            <option value="buyer">Buyer</option>
+                            <option value="seller">Seller/Vendor</option>
+                            <option value="both">Both Buyer & Seller</option>
+                        </select>
+                    </div>
+                    <div>
+                        <Label htmlFor="notes">Notes</Label>
+                        <textarea
+                            id="notes"
+                            placeholder="Additional notes..."
+                            value={newCustomer.notes}
+                            onChange={(e) => setNewCustomer({ ...newCustomer, notes: e.target.value })}
+                            className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            rows={3}
+                        />
                     </div>
                 </div>
-            )}
+            </Modal>
 
             {/* Edit Customer Modal */}
-            {showEditCustomer && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl p-6 w-full max-w-md">
-                        <h2 className="text-2xl font-bold text-gray-800 mb-4">Edit Customer</h2>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                                <input
-                                    type="text"
-                                    value={editForm.name}
-                                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                                <input
-                                    type="tel"
-                                    value={editForm.phone}
-                                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                                <input
-                                    type="email"
-                                    value={editForm.email}
-                                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                                <input
-                                    type="text"
-                                    value={editForm.location}
-                                    onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                                <select
-                                    value={editForm.status}
-                                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                                >
-                                    <option value="Active">Active</option>
-                                    <option value="VIP">VIP</option>
-                                    <option value="Inactive">Inactive</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                                <textarea
-                                    value={editForm.notes}
-                                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                                    rows={3}
-                                />
-                            </div>
-                        </div>
-                        <div className="flex gap-3 mt-6">
-                            <button
-                                onClick={() => setShowEditCustomer(false)}
-                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleEditCustomer}
-                                disabled={loading}
-                                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                            >
-                                {loading ? 'Saving...' : 'Save Changes'}
-                            </button>
-                        </div>
+            <Modal
+                isOpen={showEditCustomer}
+                onClose={() => setShowEditCustomer(false)}
+                title="Edit Customer"
+                size="md"
+                footer={
+                    <div className="flex gap-3 justify-end">
+                        <Button variant="secondary" onClick={() => setShowEditCustomer(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleEditCustomer} disabled={loading}>
+                            {loading ? 'Saving...' : 'Save Changes'}
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-4">
+                    <div>
+                        <Label htmlFor="edit-name">Name *</Label>
+                        <Input
+                            id="edit-name"
+                            value={editForm.name}
+                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-phone">Phone</Label>
+                        <Input
+                            id="edit-phone"
+                            type="tel"
+                            value={editForm.phone}
+                            onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-email">Email</Label>
+                        <Input
+                            id="edit-email"
+                            type="email"
+                            value={editForm.email}
+                            onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-location">Location</Label>
+                        <Input
+                            id="edit-location"
+                            value={editForm.location}
+                            onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-status">Status</Label>
+                        <select
+                            id="edit-status"
+                            value={editForm.status}
+                            onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                            className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                        >
+                            <option value="Active">Active</option>
+                            <option value="VIP">VIP</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-customer-type">Customer Type</Label>
+                        <select
+                            id="edit-customer-type"
+                            value={editForm.customer_type}
+                            onChange={(e) => setEditForm({ ...editForm, customer_type: e.target.value })}
+                            className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                        >
+                            <option value="buyer">Buyer</option>
+                            <option value="seller">Seller/Vendor</option>
+                            <option value="both">Both Buyer & Seller</option>
+                        </select>
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-notes">Notes</Label>
+                        <textarea
+                            id="edit-notes"
+                            value={editForm.notes}
+                            onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                            className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            rows={3}
+                        />
                     </div>
                 </div>
-            )}
+            </Modal>
 
             {/* Add Purchase Modal */}
-            {showAddPurchase && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-                        <h2 className="text-2xl font-bold text-gray-800 mb-4">Add Purchase</h2>
-                        
-                        <div className="space-y-4 mb-6">
-                            <h3 className="font-semibold text-gray-700">Items</h3>
+            <Modal
+                isOpen={showAddPurchase}
+                onClose={() => setShowAddPurchase(false)}
+                title="Add Purchase"
+                size="lg"
+                footer={
+                    <div className="flex gap-3 justify-end">
+                        <Button variant="secondary" onClick={() => setShowAddPurchase(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleAddPurchase} disabled={loading}>
+                            {loading ? 'Adding...' : 'Add Purchase'}
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+                    {/* Items */}
+                    <div>
+                        <Label className="mb-3 block">Purchase Items *</Label>
+                        <div className="space-y-3 bg-neutral-50 p-4 rounded-lg border border-neutral-200">
                             {newPurchase.items.map((item, index) => (
-                                <div key={index} className="flex gap-3 items-start">
-                                    <input
-                                        type="text"
-                                        placeholder="Item name"
-                                        value={item.name}
-                                        onChange={(e) => updatePurchaseItem(index, 'name', e.target.value)}
-                                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                                    />
-                                    <input
-                                        type="number"
-                                        placeholder="Qty"
-                                        value={item.qty}
-                                        onChange={(e) => updatePurchaseItem(index, 'qty', Number(e.target.value))}
-                                        className="w-20 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                                    />
-                                    <input
-                                        type="number"
-                                        placeholder="Price"
-                                        value={item.price}
-                                        onChange={(e) => updatePurchaseItem(index, 'price', Number(e.target.value))}
-                                        className="w-28 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                                    />
-                                    {newPurchase.items.length > 1 && (
-                                        <button
-                                            onClick={() => removePurchaseItem(index)}
-                                            className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                        >
-                                            Remove
-                                        </button>
-                                    )}
+                                <div key={index} className="space-y-2 p-3 bg-white rounded-lg border border-neutral-200">
+                                    <div className="flex gap-2 items-end">
+                                        <div className="flex-1">
+                                            <Label htmlFor={`item-name-${index}`} className="text-xs">Product Name *</Label>
+                                            <Input
+                                                id={`item-name-${index}`}
+                                                placeholder="Enter product name (e.g., Shirt, Shoe)"
+                                                value={item.name}
+                                                onChange={(e) => updatePurchaseItem(index, 'name', e.target.value)}
+                                                className="w-full"
+                                            />
+                                        </div>
+                                        <div className="w-20">
+                                            <Label htmlFor={`item-qty-${index}`} className="text-xs">Qty *</Label>
+                                            <Input
+                                                id={`item-qty-${index}`}
+                                                type="number"
+                                                placeholder="1"
+                                                value={item.qty}
+                                                onChange={(e) => updatePurchaseItem(index, 'qty', Number(e.target.value))}
+                                            />
+                                        </div>
+                                        <div className="w-24">
+                                            <Label htmlFor={`item-price-${index}`} className="text-xs">Price *</Label>
+                                            <Input
+                                                id={`item-price-${index}`}
+                                                type="number"
+                                                placeholder="0"
+                                                value={item.price}
+                                                onChange={(e) => updatePurchaseItem(index, 'price', Number(e.target.value))}
+                                            />
+                                        </div>
+                                        {newPurchase.items.length > 1 && (
+                                            <Button
+                                                variant="danger"
+                                                size="sm"
+                                                onClick={() => removePurchaseItem(index)}
+                                            >
+                                                <Trash2 size={16} />
+                                            </Button>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-neutral-600 text-right">
+                                        Subtotal: ₹{(item.qty * item.price).toFixed(2)}
+                                    </div>
                                 </div>
                             ))}
-                            <button
-                                onClick={addPurchaseItem}
-                                className="text-indigo-600 hover:text-indigo-700 font-medium"
-                            >
-                                + Add Item
-                            </button>
                         </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={addPurchaseItem}
+                            className="mt-3 w-full"
+                        >
+                            <Plus size={16} className="mr-2" />
+                            Add Another Item
+                        </Button>
+                    </div>
 
-                        <div className="grid grid-cols-2 gap-4 mb-4">
+                    {/* Purchase Details */}
+                    <div>
+                        <Label className="mb-3 block">Purchase Details</Label>
+                        <div className="grid grid-cols-3 gap-3">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+                                <Label htmlFor="payment-method" className="text-xs">Payment Method</Label>
                                 <select
+                                    id="payment-method"
                                     value={newPurchase.payment_method}
                                     onChange={(e) => setNewPurchase({ ...newPurchase, payment_method: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                                 >
                                     <option>Cash</option>
                                     <option>Card</option>
@@ -607,51 +910,104 @@ export default function Customers() {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Purchase Date</label>
-                                <input
+                                <Label htmlFor="purchase-date" className="text-xs">Date *</Label>
+                                <Input
+                                    id="purchase-date"
                                     type="date"
                                     value={newPurchase.purchase_date}
                                     onChange={(e) => setNewPurchase({ ...newPurchase, purchase_date: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                    className="text-sm"
                                 />
                             </div>
                         </div>
+                    </div>
 
+                    <div>
+                        <Label htmlFor="purchase-notes" className="text-xs">Notes (Optional)</Label>
                         <textarea
-                            placeholder="Notes (optional)"
+                            id="purchase-notes"
+                            placeholder="Add any notes about this purchase..."
                             value={newPurchase.notes}
                             onChange={(e) => setNewPurchase({ ...newPurchase, notes: e.target.value })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 mb-4"
+                            className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                             rows={2}
                         />
+                    </div>
 
-                        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                    {/* Total */}
+                    <div className="bg-gradient-to-r from-primary-50 to-primary-100 border border-primary-200 rounded-lg p-4">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm text-neutral-600">Subtotal:</span>
+                            <span className="font-semibold text-neutral-900">₹{newPurchase.items.reduce((sum, item) => sum + item.qty * item.price, 0).toFixed(2)}</span>
+                        </div>
+                        <div className="border-t border-primary-300 pt-2">
                             <div className="flex justify-between items-center">
-                                <span className="text-lg font-semibold text-gray-700">Total Amount:</span>
-                                <span className="text-2xl font-bold text-green-600">
-                                    ₹{newPurchase.items.reduce((sum, item) => sum + (item.qty * item.price), 0).toFixed(2)}
+                                <span className="font-semibold text-neutral-900">Total Amount:</span>
+                                <span className="text-2xl font-bold text-primary-600">
+                                    ₹{newPurchase.items.reduce((sum, item) => sum + item.qty * item.price, 0).toFixed(2)}
                                 </span>
                             </div>
                         </div>
-
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowAddPurchase(false)}
-                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleAddPurchase}
-                                disabled={loading}
-                                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                            >
-                                {loading ? 'Adding...' : 'Add Purchase'}
-                            </button>
-                        </div>
                     </div>
                 </div>
-            )}
+            </Modal>
+            {/* Delete Confirmation Modal */}
+            <Modal
+                isOpen={showDeleteConfirm}
+                onClose={() => {
+                    setShowDeleteConfirm(false);
+                    setDeleteTarget(null);
+                }}
+                title="Confirm Delete"
+                size="sm"
+                footer={
+                    <div className="flex gap-3 justify-end">
+                        <Button
+                            variant="secondary"
+                            onClick={() => {
+                                setShowDeleteConfirm(false);
+                                setDeleteTarget(null);
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="danger"
+                            onClick={() => {
+                                if (deleteTarget === 'single' && selectedCustomer) {
+                                    handleDeleteCustomer(selectedCustomer.id);
+                                    setShowDeleteConfirm(false);
+                                    setDeleteTarget(null);
+                                } else if (deleteTarget === 'bulk') {
+                                    handleBulkDelete();
+                                }
+                            }}
+                            disabled={loading}
+                        >
+                            {loading ? 'Deleting...' : 'Delete'}
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-4">
+                    {deleteTarget === 'single' && (
+                        <div className="text-neutral-700">
+                            <p className="font-semibold mb-2">Are you sure you want to delete this customer?</p>
+                            <p className="text-sm text-neutral-600">
+                                <strong>{selectedCustomer?.name}</strong> and all their purchase history will be permanently removed.
+                            </p>
+                        </div>
+                    )}
+                    {deleteTarget === 'bulk' && (
+                        <div className="text-neutral-700">
+                            <p className="font-semibold mb-2">Delete {selectedForDelete.size} customer(s)?</p>
+                            <p className="text-sm text-neutral-600">
+                                This action cannot be undone. All selected customers and their purchase histories will be permanently removed.
+                            </p>
+                        </div>
+                    )}
+                </div>
+            </Modal>
         </div>
     );
 }

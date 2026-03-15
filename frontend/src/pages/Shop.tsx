@@ -37,7 +37,7 @@ export default function Shop() {
             .finally(() => setLoading(false));
     }, []);
 
-    const primaryColor = storeSettings?.primary_color || '#4F46E5';
+    const primaryColor = storeSettings?.primary_color || '#0ea5e9'; // AstroCRM primary blue
     const currency = storeSettings?.currency || '₹';
 
     const categories = ['All', ...Array.from(new Set(productList.map((p: any) => p.category).filter(Boolean))) as string[]];
@@ -117,10 +117,11 @@ export default function Shop() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-neutral-50 to-neutral-100">
                 <div className="text-center">
-                    <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-gray-500">Loading store...</p>
+                    <div className="w-12 h-12 border-4 border-t-transparent rounded-full animate-spin mx-auto mb-4"
+                        style={{ borderColor: `${primaryColor}40`, borderTopColor: primaryColor }} />
+                    <p className="text-neutral-500">Loading store...</p>
                 </div>
             </div>
         );
@@ -128,14 +129,15 @@ export default function Shop() {
 
     if (!storeSettings?.is_active) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-neutral-50 to-neutral-100">
                 <div className="text-center max-w-md">
-                    <Package size={64} className="mx-auto mb-4 text-gray-300" />
-                    <h2 className="text-2xl font-bold text-gray-700">{storeSettings?.store_name || 'Store'}</h2>
-                    <p className="text-gray-500 mt-2">We'll be back soon! The store is temporarily offline.</p>
+                    <Package size={64} className="mx-auto mb-4 text-neutral-300" />
+                    <h2 className="text-2xl font-bold text-neutral-700">{storeSettings?.store_name || 'Store'}</h2>
+                    <p className="text-neutral-500 mt-2">We'll be back soon! The store is temporarily offline.</p>
                     {storeSettings?.contact_phone && (
                         <a href={`tel:${storeSettings.contact_phone}`}
-                            className="inline-flex items-center gap-2 mt-4 text-indigo-600 font-medium">
+                            className="inline-flex items-center gap-2 mt-4 font-medium"
+                            style={{ color: primaryColor }}>
                             <Phone size={16} /> {storeSettings.contact_phone}
                         </a>
                     )}
@@ -147,18 +149,18 @@ export default function Shop() {
     // Order Success Screen
     if (orderSuccess) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-neutral-50 to-neutral-100 p-4">
                 <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center">
                     <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
-                        style={{ background: `${primaryColor}20` }}>
+                        style={{ background: `${primaryColor}15` }}>
                         <CheckCircle size={40} style={{ color: primaryColor }} />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Order Placed!</h2>
-                    <p className="text-gray-500 mb-1">Your order number is</p>
+                    <h2 className="text-2xl font-bold text-neutral-800 mb-2">Order Placed!</h2>
+                    <p className="text-neutral-500 mb-1">Your order number is</p>
                     <p className="text-xl font-bold font-mono" style={{ color: primaryColor }}>{orderSuccess}</p>
-                    <p className="text-sm text-gray-500 mt-3">We'll contact you shortly to confirm your order.</p>
+                    <p className="text-sm text-neutral-500 mt-3">We'll contact you shortly to confirm your order.</p>
                     {storeSettings?.contact_phone && (
-                        <p className="text-sm text-gray-500 mt-1">Questions? Call us at <strong>{storeSettings.contact_phone}</strong></p>
+                        <p className="text-sm text-neutral-500 mt-1">Questions? Call us at <strong>{storeSettings.contact_phone}</strong></p>
                     )}
                     <button onClick={() => setOrderSuccess(null)}
                         className="mt-6 w-full py-3 rounded-xl text-white font-semibold text-sm"
@@ -171,9 +173,9 @@ export default function Shop() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100">
             {/* ── NAVBAR ── */}
-            <nav className="sticky top-0 z-40 bg-white shadow-sm border-b border-gray-100">
+            <nav className="sticky top-0 z-40 bg-white shadow-sm border-b border-neutral-200">
                 <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-sm"
@@ -181,9 +183,9 @@ export default function Shop() {
                             {(storeSettings?.store_name || 'S').charAt(0).toUpperCase()}
                         </div>
                         <div>
-                            <p className="font-bold text-gray-900 text-sm leading-tight">{storeSettings?.store_name || 'Store'}</p>
+                            <p className="font-bold text-neutral-900 text-sm leading-tight">{storeSettings?.store_name || 'Store'}</p>
                             {storeSettings?.store_tagline && (
-                                <p className="text-xs text-gray-500 leading-tight hidden sm:block">{storeSettings.store_tagline}</p>
+                                <p className="text-xs text-neutral-500 leading-tight hidden sm:block">{storeSettings.store_tagline}</p>
                             )}
                         </div>
                     </div>
@@ -193,7 +195,7 @@ export default function Shop() {
                         <ShoppingCart size={16} />
                         <span className="hidden sm:inline">Cart</span>
                         {cartCount > 0 && (
-                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                            <span className="absolute -top-2 -right-2 bg-danger-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
                                 {cartCount}
                             </span>
                         )}
@@ -216,13 +218,13 @@ export default function Shop() {
                 {/* ── SEARCH + FILTER ── */}
                 <div className="flex flex-col sm:flex-row gap-3 mb-6">
                     <div className="relative flex-1">
-                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                         <input
                             type="text"
                             placeholder="Search products..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 bg-white text-sm"
+                            className="w-full pl-9 pr-4 py-2.5 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 bg-white text-sm"
                             style={{ '--tw-ring-color': primaryColor } as any}
                         />
                     </div>
@@ -232,7 +234,7 @@ export default function Shop() {
                                 <button key={cat} onClick={() => setSelectedCategory(cat)}
                                     className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all ${selectedCategory === cat
                                         ? 'text-white shadow-md'
-                                        : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
+                                        : 'bg-white border border-neutral-200 text-neutral-600 hover:border-neutral-300'
                                         }`}
                                     style={selectedCategory === cat ? { background: primaryColor } : {}}>
                                     {cat}
@@ -245,8 +247,8 @@ export default function Shop() {
                 {/* ── PRODUCTS GRID ── */}
                 {filtered.length === 0 ? (
                     <div className="text-center py-16">
-                        <Package size={48} className="mx-auto mb-3 text-gray-200" />
-                        <p className="text-gray-400 font-medium">No products found</p>
+                        <Package size={48} className="mx-auto mb-3 text-neutral-200" />
+                        <p className="text-neutral-400 font-medium">No products found</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">

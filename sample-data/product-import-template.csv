@@ -1,0 +1,16 @@
+name,sku,barcode,category,description,selling_price,cost_price,current_stock,min_stock_level,max_stock_level,supplier
+Wireless Bluetooth Headphones,SKU-WH-001,8901234000001,Electronics,High quality wireless headphones with noise cancellation,2499,1200,50,10,100,Tech Supplier A
+Cotton T-Shirt White,SKU-TS-001,8901234000002,Clothing,Premium cotton t-shirt in white color,599,250,100,20,150,Clothing Distributor
+Office Chair - Black,SKU-OC-001,8901234000003,Furniture,Ergonomic office chair with wheels and lumbar support,8999,4500,15,5,30,Furniture Pro
+USB-C Cable 2m,SKU-UC-001,8901234000004,Electronics,Standard USB-C cable 2 meter length,399,150,200,50,300,Tech Supplier B
+Notebook A4 100 Pages,SKU-NB-001,8901234000005,Stationery,A4 size blank notebook with 100 blank pages,199,80,300,100,500,Paper & Stationery Co
+Running Shoes - Blue,SKU-RS-001,8901234000006,Sports,Professional running shoes in blue color,4999,2500,25,10,50,Sports Equipment Ltd
+Instant Noodles Pack,SKU-IN-001,8901234000007,Groceries,Pack of 5 instant noodles with vegetable flavor,149,50,500,100,1000,Food Distributor
+LED Light Bulb 10W,SKU-LB-001,8901234000008,Electronics,Energy efficient LED light bulb 10W white light,299,120,150,25,250,Lighting Solutions
+Long Sleeve Shirt,SKU-LS-001,8901234000009,Clothing,Cotton long sleeve formal shirt in multiple colors,899,400,80,15,150,Clothing Distributor
+Wireless Mouse,SKU-WM-001,8901234000010,Electronics,Wireless optical mouse with USB receiver,499,200,120,20,200,Tech Supplier A
+Bookmark Set,SKU-BK-001,8901234000011,Stationery,Set of 10 different color bookmarks,249,80,200,50,300,Paper & Stationery Co
+Water Bottle 1L,SKU-WB-001,8901234000012,Sports,Stainless steel water bottle 1 liter capacity,799,350,60,15,100,Sports Equipment Ltd
+Organic Coffee Beans,SKU-CB-001,8901234000013,Groceries,Premium organic coffee beans 500g pack,799,350,40,10,50,Food Distributor
+Corner Desk,SKU-CD-001,8901234000014,Furniture,L-shaped corner desk with storage,12999,6500,8,2,15,Furniture Pro
+Ballpoint Pen Pack,SKU-BP-001,8901234000015,Stationery,Pack of 12 blue ballpoint pens,149,50,400,100,600,Paper & Stationery Co

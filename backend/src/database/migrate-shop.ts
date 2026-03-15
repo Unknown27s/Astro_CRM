@@ -1,22 +1,75 @@
 import { execute, query } from './db';
 
 export async function migrateShop() {
-    // Products table
-    execute(`
-        CREATE TABLE IF NOT EXISTS products (
+    // Check if products table already has the new inventory schema
+    const tables = query(`SELECT name FROM sqlite_master WHERE type='table'`);
+    const tableNames = tables.map((t: any) => t.name);
+
+    let hasProductsTable = tableNames.includes('products');
+
+    if (hasProductsTable) {
+        // Check if products table has barcode column (indicating new schema)
+        const columns = query(`PRAGMA table_info(products)`);
+        const hasBarcode = columns.some((col: any) => col.name === 'barcode');
+
+        if (!hasBarcode) {
+            // Old schema - migrate to new schema
+            console.log('🔄 Upgrading products table schema...');
+            execute(`ALTER TABLE products RENAME TO products_old`);
+            execute(`CREATE TABLE products (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                sku TEXT UNIQUE,
+                barcode TEXT UNIQUE,
+                category TEXT,
+                description TEXT,
+                cost_price REAL,
+                selling_price REAL NOT NULL,
+                current_stock INTEGER DEFAULT 0,
+                min_stock_level INTEGER DEFAULT 10,
+                max_stock_level INTEGER DEFAULT 100,
+                supplier TEXT,
+                last_restock_date TEXT,
+                is_online_store_product INTEGER DEFAULT 1,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now')),
+                user_id INTEGER,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )`);
+            // Migrate data from old schema
+            execute(`INSERT INTO products (
+                id, name, description, selling_price, category, current_stock,
+                is_online_store_product, created_at
+            )
+            SELECT id, name, description, price, category, stock_qty,
+                   in_stock, created_at
+            FROM products_old`);
+            execute(`DROP TABLE products_old`);
+            console.log('✅ Products table upgraded');
+        }
+    } else {
+        // Create new products table with full inventory schema
+        execute(`CREATE TABLE IF NOT EXISTS products (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            price REAL NOT NULL DEFAULT 0,
-            original_price REAL,
-            image_url TEXT DEFAULT '',
-            category TEXT DEFAULT '',
-            stock_qty INTEGER DEFAULT 0,
-            in_stock INTEGER DEFAULT 1,
-            is_visible INTEGER DEFAULT 1,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
+            name TEXT NOT NULL UNIQUE,
+            sku TEXT UNIQUE,
+            barcode TEXT UNIQUE,
+            category TEXT,
+            description TEXT,
+            cost_price REAL,
+            selling_price REAL NOT NULL,
+            current_stock INTEGER DEFAULT 0,
+            min_stock_level INTEGER DEFAULT 10,
+            max_stock_level INTEGER DEFAULT 100,
+            supplier TEXT,
+            last_restock_date TEXT,
+            is_online_store_product INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now')),
+            user_id INTEGER,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )`);
+    }
 
     // Store settings (single row)
     execute(`
@@ -35,7 +88,6 @@ export async function migrateShop() {
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     `);
-
     // Online orders table
     execute(`
         CREATE TABLE IF NOT EXISTS online_orders (
@@ -89,7 +141,7 @@ export async function migrateShop() {
 
     try {
         execute(`ALTER TABLE store_settings ADD COLUMN asi_api_key TEXT DEFAULT ''`);
-    } catch (_) {}
+    } catch (_) { /* column already exists */ }
 
     console.log('Shop migration complete');
 }

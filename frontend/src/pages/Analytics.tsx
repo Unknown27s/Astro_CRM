@@ -12,6 +12,9 @@ import {
     ResponsiveContainer,
 } from 'recharts';
 import { Sparkles, Users, Brain, Loader2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Spinner } from '../components/ui/Avatar';
 
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
 
@@ -45,8 +48,8 @@ export default function Analytics() {
             await analytics.segmentCustomers(4);
             await loadSegments();
             toast.success('Customer segmentation completed successfully!');
-        // Auto-explain after segmentation
-        await handleExplainSegments();
+            // Auto-explain after segmentation
+            await handleExplainSegments();
         } catch (error: any) {
             toast.error(error.response?.data?.error || 'Error performing segmentation');
         } finally {
@@ -84,199 +87,260 @@ export default function Analytics() {
         color: COLORS[index % COLORS.length],
     }));
 
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-96">
+                <div className="text-center">
+                    <Spinner size="lg" className="mx-auto mb-4" />
+                    <p className="text-neutral-500">Loading analytics...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
+        <div className="space-y-6 animate-fade-in">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-800">
-                        ML Analytics & Segmentation
-                    </h1>
-                    <p className="text-gray-600 mt-1">
-                        Customer insights powered by K-means clustering
-                    </p>
+                    <h1 className="text-3xl font-bold text-neutral-900">ML Analytics & Segmentation</h1>
+                    <p className="text-neutral-500 mt-1">Customer insights powered by K-means clustering</p>
                 </div>
                 <div className="flex items-center gap-2">
                     {segments.length > 0 && (
-                        <button
+                        <Button
                             onClick={handleExplainSegments}
                             disabled={aiLoading}
-                            className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all disabled:opacity-50"
+                            size="md"
                         >
-                            {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Brain size={16} />}
-                            {aiLoading ? 'Thinking...' : 'AI Explain'}
-                        </button>
+                            {aiLoading ? (
+                                <>
+                                    <Loader2 size={16} className="animate-spin mr-2" />
+                                    Thinking...
+                                </>
+                            ) : (
+                                <>
+                                    <Brain size={16} className="mr-2" />
+                                    AI Explain
+                                </>
+                            )}
+                        </Button>
                     )}
-                    <button
+                    <Button
                         onClick={handleSegmentCustomers}
                         disabled={clustering}
-                        className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50"
+                        size="md"
                     >
-                        <Sparkles size={20} />
-                        {clustering ? 'Clustering...' : 'Run Segmentation'}
-                    </button>
+                        {clustering ? (
+                            <>
+                                <Loader2 size={16} className="animate-spin mr-2" />
+                                Clustering...
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles size={16} className="mr-2" />
+                                Run Segmentation
+                            </>
+                        )}
+                    </Button>
                 </div>
             </div>
 
-            {segments.length === 0 && !loading ? (
-                <div className="bg-white rounded-xl shadow-md p-12 text-center">
-                    <Sparkles size={48} className="mx-auto text-purple-500 mb-4" />
-                    <h3 className="text-xl font-bold text-gray-800 mb-2">
-                        No Segments Yet
-                    </h3>
-                    <p className="text-gray-600 mb-6">
-                        Run customer segmentation to analyze your customer base using K-means
-                        clustering
-                    </p>
-                    <button
-                        onClick={handleSegmentCustomers}
-                        disabled={clustering}
-                        className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50"
-                    >
-                        {clustering ? 'Clustering...' : 'Run Segmentation Now'}
-                    </button>
-                </div>
+            {segments.length === 0 ? (
+                <Card>
+                    <CardContent className="p-12">
+                        <div className="text-center">
+                            <div className="w-16 h-16 rounded-lg bg-primary-100 flex items-center justify-center mx-auto mb-4">
+                                <Sparkles size={32} className="text-primary-600" />
+                            </div>
+                            <h3 className="text-xl font-bold text-neutral-900 mb-2">No Segments Yet</h3>
+                            <p className="text-neutral-500 mb-6">
+                                Run customer segmentation to analyze your customer base using K-means clustering
+                            </p>
+                            <Button
+                                onClick={handleSegmentCustomers}
+                                disabled={clustering}
+                                size="md"
+                            >
+                                {clustering ? 'Clustering...' : 'Run Segmentation Now'}
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
             ) : (
                 <>
                     {/* Segment Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         {segments.map((segment, index) => (
-                            <div
+                            <Card
                                 key={segment.segment_id}
-                                className="bg-white rounded-xl shadow-md p-6 cursor-pointer hover:shadow-lg transition-shadow"
+                                className="cursor-pointer hover:shadow-md transition-all"
                                 onClick={() => loadSegmentCustomers(segment.segment_id)}
                                 style={{
-                                    borderTop: `4px solid ${COLORS[index % COLORS.length]}`,
+                                    borderLeft: `4px solid ${COLORS[index % COLORS.length]}`,
                                 }}
                             >
-                                <div className="flex items-center justify-between mb-3">
-                                    <h3 className="font-bold text-gray-800">
-                                        {segment.segment_name}
-                                    </h3>
-                                    <div
-                                        className="p-2 rounded-lg"
-                                        style={{ backgroundColor: `${COLORS[index % COLORS.length]}20` }}
-                                    >
-                                        <Users
-                                            size={20}
-                                            style={{ color: COLORS[index % COLORS.length] }}
-                                        />
+                                <CardContent className="p-5">
+                                    <div className="flex items-start justify-between mb-4">
+                                        <h3 className="font-semibold text-neutral-900">{segment.segment_name}</h3>
+                                        <div
+                                            className="p-2 rounded-lg"
+                                            style={{ backgroundColor: `${COLORS[index % COLORS.length]}15` }}
+                                        >
+                                            <Users
+                                                size={18}
+                                                style={{ color: COLORS[index % COLORS.length] }}
+                                            />
+                                        </div>
                                     </div>
-                                </div>
-                                <p className="text-2xl font-bold text-gray-800">
-                                    {segment.customer_count}
-                                </p>
-                                <p className="text-sm text-gray-600 mt-1">customers</p>
-                                <div className="mt-4 pt-4 border-t">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-600">Avg Value:</span>
-                                        <span className="font-semibold">
-                                            ${(segment.avg_value || 0).toFixed(0)}
-                                        </span>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <p className="text-3xl font-bold text-neutral-900">
+                                                {segment.customer_count}
+                                            </p>
+                                            <p className="text-xs text-neutral-500 mt-1">customers</p>
+                                        </div>
+                                        <div className="pt-3 border-t border-neutral-100 space-y-2">
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-neutral-500">Avg Value:</span>
+                                                <span className="font-semibold text-neutral-900">
+                                                    ₹{(segment.avg_value || 0).toFixed(0)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-neutral-500">Avg Frequency:</span>
+                                                <span className="font-semibold text-neutral-900">
+                                                    {(segment.avg_frequency || 0).toFixed(1)}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="flex justify-between text-sm mt-1">
-                                        <span className="text-gray-600">Avg Frequency:</span>
-                                        <span className="font-semibold">
-                                            {(segment.avg_frequency || 0).toFixed(1)}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
+                                </CardContent>
+                            </Card>
                         ))}
                     </div>
 
                     {/* Scatter Plot */}
-                    <div className="bg-white rounded-xl shadow-md p-6">
-                        <h2 className="text-xl font-bold text-gray-800 mb-4">
-                            Customer Segmentation Visualization
-                        </h2>
-                        <ResponsiveContainer width="100%" height={400}>
-                            <ScatterChart>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis
-                                    type="number"
-                                    dataKey="value"
-                                    name="Customer Value"
-                                    label={{ value: 'Customer Value ($)', position: 'bottom' }}
-                                />
-                                <YAxis
-                                    type="number"
-                                    dataKey="frequency"
-                                    name="Purchase Frequency"
-                                    label={{
-                                        value: 'Purchase Frequency',
-                                        angle: -90,
-                                        position: 'left',
-                                    }}
-                                />
-                                <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-                                <Legend />
-                                {segments.map((segment, index) => (
-                                    <Scatter
-                                        key={segment.segment_id}
-                                        name={segment.segment_name}
-                                        data={scatterData.filter(
-                                            (d) => d.segment === segment.segment_name
-                                        )}
-                                        fill={COLORS[index % COLORS.length]}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Customer Segmentation Visualization</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={400}>
+                                <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                    <XAxis
+                                        type="number"
+                                        dataKey="value"
+                                        name="Customer Value"
+                                        label={{ value: 'Customer Value ($)', position: 'bottom', offset: 10 }}
+                                        stroke="#9ca3af"
                                     />
-                                ))}
-                            </ScatterChart>
-                        </ResponsiveContainer>
-                    </div>
+                                    <YAxis
+                                        type="number"
+                                        dataKey="frequency"
+                                        name="Purchase Frequency"
+                                        label={{
+                                            value: 'Purchase Frequency',
+                                            angle: -90,
+                                            position: 'insideLeft',
+                                            style: { textAnchor: 'middle' },
+                                        }}
+                                        stroke="#9ca3af"
+                                    />
+                                    <Tooltip
+                                        cursor={{ strokeDasharray: '3 3' }}
+                                        contentStyle={{
+                                            backgroundColor: '#fff',
+                                            border: '1px solid #e5e7eb',
+                                            borderRadius: '8px',
+                                        }}
+                                    />
+                                    <Legend />
+                                    {segments.map((segment, index) => (
+                                        <Scatter
+                                            key={segment.segment_id}
+                                            name={segment.segment_name}
+                                            data={scatterData.filter(
+                                                (d) => d.segment === segment.segment_name
+                                            )}
+                                            fill={COLORS[index % COLORS.length]}
+                                        />
+                                    ))}
+                                </ScatterChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
 
                     {/* Selected Segment Customers */}
                     {selectedSegment !== null && segmentCustomers.length > 0 && (
-                        <div className="bg-white rounded-xl shadow-md p-6">
-                            <h2 className="text-xl font-bold text-gray-800 mb-4">
-                                Customers in{' '}
-                                {segments.find((s) => s.segment_id === selectedSegment)
-                                    ?.segment_name}
-                            </h2>
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead className="bg-gray-50 border-b">
-                                        <tr>
-                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                                Name
-                                            </th>
-                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                                Location
-                                            </th>
-                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                                Phone
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y">
-                                        {segmentCustomers.slice(0, 10).map((customer) => (
-                                            <tr key={customer.id}>
-                                                <td className="px-4 py-2">
-                                                    {customer.name}
-                                                </td>
-                                                <td className="px-4 py-2">{customer.location || '-'}</td>
-                                                <td className="px-4 py-2">{customer.phone || '-'}</td>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>
+                                    Customers in{' '}
+                                    {segments.find((s) => s.segment_id === selectedSegment)?.segment_name}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-neutral-200">
+                                                <th className="px-4 py-3 text-left font-semibold text-neutral-600">
+                                                    Name
+                                                </th>
+                                                <th className="px-4 py-3 text-left font-semibold text-neutral-600">
+                                                    Location
+                                                </th>
+                                                <th className="px-4 py-3 text-left font-semibold text-neutral-600">
+                                                    Phone
+                                                </th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                                        </thead>
+                                        <tbody>
+                                            {segmentCustomers.slice(0, 10).map((customer) => (
+                                                <tr
+                                                    key={customer.id}
+                                                    className="border-b border-neutral-100 hover:bg-neutral-50"
+                                                >
+                                                    <td className="px-4 py-3 text-neutral-900">
+                                                        {customer.name}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-neutral-600">
+                                                        {customer.location || '-'}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-neutral-600">
+                                                        {customer.phone || '-'}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </CardContent>
+                        </Card>
                     )}
 
                     {/* AI Explanation Panel */}
                     {aiExplanation && (
-                        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 p-6">
-                            <div className="flex items-center gap-2 mb-3">
-                                <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                                    <Brain size={16} className="text-white" />
+                        <Card className="border-primary-200 bg-gradient-to-r from-primary-50 to-primary-50">
+                            <CardContent className="p-6">
+                                <div className="flex items-start gap-4">
+                                    <div className="p-3 rounded-lg bg-gradient-to-br from-primary-600 to-primary-700 flex-shrink-0">
+                                        <Brain size={20} className="text-white" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-semibold text-neutral-900 mb-1">
+                                            AI Segment Analysis
+                                        </h3>
+                                        <p className="text-xs text-neutral-500 mb-3">Powered by ASI:One</p>
+                                        <p className="text-sm text-neutral-700 leading-relaxed whitespace-pre-line">
+                                            {aiExplanation}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 className="text-sm font-bold text-gray-800">AI Segment Analysis</h3>
-                                    <p className="text-[10px] text-gray-500">Powered by ASI:One</p>
-                                </div>
-                            </div>
-                            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{aiExplanation}</p>
-                        </div>
+                            </CardContent>
+                        </Card>
                     )}
                 </>
             )}

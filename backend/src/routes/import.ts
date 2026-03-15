@@ -149,11 +149,11 @@ router.post('/execute', upload.single('file'), async (req: Request, res: Respons
         }
 
         const { importType = 'customers', fieldMapping } = req.body;
-        
+
         if (!fieldMapping) {
             return res.status(400).json({ error: 'Field mapping is required' });
         }
-        
+
         let mapping: Record<string, string>;
         try {
             mapping = JSON.parse(fieldMapping);
@@ -206,21 +206,21 @@ router.post('/execute', upload.single('file'), async (req: Request, res: Respons
 
                     // Check for duplicate phone number or email
                     let isDuplicate = false;
-                    
+
                     if (mappedData.phone) {
                         const existingByPhone = queryOne('SELECT id FROM customers WHERE phone = ?', [mappedData.phone]);
                         if (existingByPhone) {
                             isDuplicate = true;
                         }
                     }
-                    
+
                     if (!isDuplicate && mappedData.email) {
                         const existingByEmail = queryOne('SELECT id FROM customers WHERE email = ?', [mappedData.email]);
                         if (existingByEmail) {
                             isDuplicate = true;
                         }
                     }
-                    
+
                     if (isDuplicate) {
                         skipped++;
                         return; // Skip this row
@@ -240,6 +240,93 @@ router.post('/execute', upload.single('file'), async (req: Request, res: Respons
                         ]
                     );
                     imported++;
+                } catch (err: any) {
+                    errors.push({ row: index + 1, error: err.message });
+                }
+            });
+        } else if (importType === 'products') {
+            // Handle product import with stock updates
+            data.forEach((row, index) => {
+                try {
+                    const mappedData: any = {};
+                    Object.keys(mapping).forEach(key => {
+                        const sourceField = mapping[key];
+                        if (sourceField && row[sourceField] !== undefined && row[sourceField] !== null) {
+                            mappedData[key] = row[sourceField];
+                        }
+                    });
+
+                    // Validate required fields
+                    if (!mappedData.name || mappedData.name.trim() === '') {
+                        throw new Error('Product name is required');
+                    }
+                    if (!mappedData.sku && !mappedData.barcode) {
+                        throw new Error('SKU or barcode is required');
+                    }
+
+                    // Check if product exists by SKU or barcode
+                    let existingProduct = null;
+                    if (mappedData.sku) {
+                        existingProduct = queryOne('SELECT id FROM products WHERE sku = ?', [mappedData.sku]);
+                    }
+                    if (!existingProduct && mappedData.barcode) {
+                        existingProduct = queryOne('SELECT id FROM products WHERE barcode = ?', [mappedData.barcode]);
+                    }
+
+                    if (existingProduct) {
+                        // Update existing product
+                        execute(
+                            `UPDATE products SET
+                                name = ?,
+                                category = ?,
+                                description = ?,
+                                selling_price = ?,
+                                cost_price = ?,
+                                current_stock = ?,
+                                min_stock_level = ?,
+                                max_stock_level = ?,
+                                supplier = ?,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = ?`,
+                            [
+                                mappedData.name.trim(),
+                                mappedData.category || null,
+                                mappedData.description || null,
+                                Number(mappedData.selling_price) || null,
+                                Number(mappedData.cost_price) || null,
+                                Number(mappedData.current_stock) || 0,
+                                Number(mappedData.min_stock_level) || 0,
+                                Number(mappedData.max_stock_level) || 0,
+                                mappedData.supplier || null,
+                                existingProduct.id
+                            ]
+                        );
+                        skipped++;
+                    } else {
+                        // Create new product
+                        execute(
+                            `INSERT INTO products (
+                                name, sku, barcode, category, description,
+                                selling_price, cost_price, current_stock,
+                                min_stock_level, max_stock_level, supplier,
+                                created_at, updated_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+                            [
+                                mappedData.name.trim(),
+                                mappedData.sku || null,
+                                mappedData.barcode || null,
+                                mappedData.category || null,
+                                mappedData.description || null,
+                                Number(mappedData.selling_price) || null,
+                                Number(mappedData.cost_price) || null,
+                                Number(mappedData.current_stock) || 0,
+                                Number(mappedData.min_stock_level) || 0,
+                                Number(mappedData.max_stock_level) || 0,
+                                mappedData.supplier || null
+                            ]
+                        );
+                        imported++;
+                    }
                 } catch (err: any) {
                     errors.push({ row: index + 1, error: err.message });
                 }

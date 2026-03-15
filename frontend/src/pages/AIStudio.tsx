@@ -15,6 +15,10 @@ import {
     Eye,
     EyeOff,
 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Badge } from '../components/ui/Badge';
+import { Input } from '../components/ui/Input';
 
 const capabilityCards = [
     {
@@ -244,186 +248,231 @@ export default function AIStudio() {
         text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>');
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 animate-fade-in">
+            {/* Header */}
             <header className="flex flex-col gap-1">
-                <p className="text-sm text-indigo-600 font-semibold">ASI:One Intelligence</p>
-                <h1 className="text-3xl font-bold text-gray-900">AI Studio</h1>
-                <p className="text-sm text-gray-500 max-w-2xl">
+                <Badge variant="default" className="w-fit">ASI:One Intelligence</Badge>
+                <h1 className="text-3xl font-bold text-neutral-900">AI Studio</h1>
+                <p className="text-sm text-neutral-500 max-w-2xl">
                     A dedicated workspace to chat with Astro AI, trigger pre-built prompts, and inspect the API surface
                     that drives our backend AI routes.
                 </p>
             </header>
 
-            <section className="grid lg:grid-cols-2 gap-6">
+            {/* Quick Actions Grid */}
+            <section className="grid lg:grid-cols-2 gap-4">
                 {quickActions.map((action) => {
                     const Icon = action.icon;
                     const result = actionResults[action.id];
                     const loading = loadingAction === action.id;
                     return (
-                        <div key={action.id} className="rounded-2xl border border-gray-200 shadow-sm bg-white overflow-hidden">
-                            <button
-                                onClick={() => handleQuickAction(action)}
-                                disabled={loading}
-                                className="w-full text-left px-5 py-4 flex items-start gap-4"
-                            >
-                                <div
-                                    className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${action.color} flex items-center justify-center flex-shrink-0`}
+                        <Card
+                            key={action.id}
+                            className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                            onClick={() => !loading && handleQuickAction(action)}
+                        >
+                            <CardContent className="p-5">
+                                <button
+                                    onClick={() => handleQuickAction(action)}
+                                    disabled={loading}
+                                    className="w-full text-left disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {loading ? <Loader2 size={20} className="text-white animate-spin" /> : <Icon size={22} className="text-white" />}
-                                </div>
-                                <div className="flex-1">
-                                    <p className="font-semibold text-gray-900">{action.label}</p>
-                                    <p className="text-sm text-gray-500 mt-1">{action.description}</p>
-                                </div>
-                                <span className="text-gray-400">→</span>
-                            </button>
-                            {result && (
-                                <div className="px-5 pb-4 text-sm text-gray-700 bg-gray-50">
-                                    <p className="whitespace-pre-line" dangerouslySetInnerHTML={{ __html: renderMarkdown(result) }} />
-                                </div>
-                            )}
-                        </div>
+                                    <div className="flex items-start gap-4">
+                                        <div
+                                            className={`w-12 h-12 rounded-lg bg-gradient-to-br ${action.color} flex items-center justify-center flex-shrink-0`}
+                                        >
+                                            {loading ? (
+                                                <Loader2 size={20} className="text-white animate-spin" />
+                                            ) : (
+                                                <Icon size={22} className="text-white" />
+                                            )}
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-semibold text-neutral-900">{action.label}</p>
+                                            <p className="text-sm text-neutral-500 mt-1">{action.description}</p>
+                                        </div>
+                                    </div>
+                                </button>
+                                {result && (
+                                    <div className="mt-4 pt-4 border-t border-neutral-100">
+                                        <p
+                                            className="text-sm text-neutral-700 whitespace-pre-line"
+                                            dangerouslySetInnerHTML={{ __html: renderMarkdown(result) }}
+                                        />
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
                     );
                 })}
             </section>
 
+            {/* Main Chat Section */}
             <section className="grid lg:grid-cols-[2fr_1fr] gap-6">
-                <div className="flex flex-col bg-white rounded-2xl border border-gray-200">
-                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                        <div>
-                            <p className="text-xs uppercase text-gray-500 tracking-widest">Conversational</p>
-                            <h2 className="text-lg font-semibold text-gray-900">Ask Astro AI anything</h2>
+                {/* Chat Panel */}
+                <Card className="flex flex-col h-[600px]">
+                    <CardHeader className="border-b border-neutral-200">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs uppercase text-neutral-500 tracking-widest">Conversational</p>
+                                <CardTitle>Ask Astro AI anything</CardTitle>
+                            </div>
+                            <Send size={18} className="text-primary-600" />
                         </div>
-                        <Send size={18} className="text-indigo-600" />
-                    </div>
-                    <div className="p-6 space-y-4 h-[420px] overflow-y-auto">
+                    </CardHeader>
+                    <CardContent className="flex-1 overflow-y-auto p-6 space-y-4">
                         {messages.map((message, idx) => (
                             <div key={idx} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 {message.role === 'assistant' && (
-                                    <div className="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center mr-2">
+                                    <div className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center mr-3 flex-shrink-0">
                                         <Bot size={16} />
                                     </div>
                                 )}
                                 <div
-                                    className={`max-w-[85%] px-4 py-3 text-sm leading-relaxed rounded-2xl ${
-                                        message.role === 'user'
-                                            ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-br-sm'
-                                            : 'bg-gray-50 border border-gray-100 text-gray-800 rounded-bl-sm'
-                                    }`}
+                                    className={`max-w-[75%] px-4 py-3 text-sm leading-relaxed rounded-lg ${message.role === 'user'
+                                            ? 'bg-gradient-to-br from-primary-600 to-primary-700 text-white rounded-br-none'
+                                            : 'bg-neutral-100 text-neutral-900 rounded-bl-none border border-neutral-200'
+                                        }`}
                                     dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content) }}
                                 />
                             </div>
                         ))}
                         <div ref={endRef} />
+                    </CardContent>
+                    <div className="border-t border-neutral-200 p-4 bg-neutral-50">
+                        <div className="flex items-center gap-2">
+                            <Input
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        void handleSend();
+                                    }
+                                }}
+                                placeholder="Type a prompt like 'Summarize today's sales'"
+                                className="flex-1"
+                                disabled={isLoading}
+                            />
+                            <Button
+                                onClick={() => void handleSend()}
+                                disabled={!input.trim() || isLoading}
+                                size="icon"
+                            >
+                                {isLoading ? (
+                                    <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                    <Send size={16} />
+                                )}
+                            </Button>
+                        </div>
                     </div>
-                    <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center gap-3">
-                        <input
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault();
-                                    void handleSend();
-                                }
-                            }}
-                            placeholder="Type a prompt like 'Summarize today's sales'"
-                            className="flex-1 px-3 py-2 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        />
-                        <button
-                            onClick={() => void handleSend()}
-                            disabled={!input.trim() || isLoading}
-                            className="w-10 h-10 bg-indigo-600 text-white rounded-2xl flex items-center justify-center disabled:opacity-60"
-                        >
-                            {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                        </button>
-                    </div>
-                </div>
+                </Card>
 
-                <div className="space-y-4">
-                    <article className="bg-white border border-gray-200 rounded-2xl p-5">
-                        <p className="text-xs uppercase text-gray-500 tracking-wide">API Surface</p>
-                        <h3 className="text-lg font-semibold text-gray-900 mt-1">Endpoints powering AI Studio</h3>
-                        <p className="text-sm text-gray-500 mt-2">Each card below matches a backend route you can call from automation or Zapier.</p>
-                        <div className="mt-4 space-y-3">
+                {/* Sidebar */}
+                <div className="space-y-4 flex flex-col">
+                    {/* API Surface Card */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">API Surface</CardTitle>
+                            <p className="text-xs text-neutral-500 mt-1">
+                                Each endpoint below matches a backend route you can call from automation or Zapier.
+                            </p>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
                             {capabilityCards.map((card) => (
-                                <div key={card.path} className="rounded-xl border border-gray-100 px-4 py-3 bg-gray-50">
-                                    <p className="text-sm font-medium text-gray-900">{card.title}</p>
-                                    <p className="text-xs text-indigo-600 mt-0.5">{card.path}</p>
-                                    <p className="text-xs text-gray-500 mt-1">{card.description}</p>
-                                        <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-                                            <span>POST /api/ai</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => copyApiSnippet(card.path)}
-                                                className="flex items-center gap-1 text-indigo-600 font-semibold"
-                                            >
-                                                <Copy size={12} />
-                                                Copy API call
-                                            </button>
-                                        </div>
+                                <div key={card.path} className="rounded-lg border border-neutral-200 p-3 bg-neutral-50 hover:border-primary-300 transition-colors">
+                                    <p className="text-sm font-medium text-neutral-900">{card.title}</p>
+                                    <p className="text-xs text-primary-600 mt-1 font-mono">{card.path}</p>
+                                    <p className="text-xs text-neutral-500 mt-1">{card.description}</p>
+                                    <div className="mt-2 flex items-center justify-between text-xs text-neutral-500">
+                                        <span>POST /api/ai</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => copyApiSnippet(card.path)}
+                                            className="flex items-center gap-1 text-primary-600 font-semibold hover:text-primary-700"
+                                        >
+                                            <Copy size={12} />
+                                            Copy
+                                        </button>
                                     </div>
+                                </div>
                             ))}
-                        </div>
-                    </article>
-                    <article className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-3">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-full bg-indigo-50">
-                                <KeyRound size={18} className="text-indigo-600" />
+                        </CardContent>
+                    </Card>
+
+                    {/* API Key Card */}
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-primary-50">
+                                    <KeyRound size={18} className="text-primary-600" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-base">ASI:One API Key</CardTitle>
+                                    <p className="text-xs text-neutral-500 mt-0.5">Keep this workspace running</p>
+                                </div>
                             </div>
-                            <div>
-                                <p className="text-sm font-semibold text-gray-900">ASI:One API key</p>
-                                <p className="text-xs text-gray-500">Update the key and keep this workspace running.</p>
-                            </div>
-                        </div>
-                        <div className="space-y-2">
+                        </CardHeader>
+                        <CardContent className="space-y-3">
                             <div className="flex items-center gap-2">
-                                <input
+                                <Input
                                     type={showAsiKey ? 'text' : 'password'}
                                     value={asiKeyInput}
                                     placeholder="Paste ASI:One API key"
                                     autoComplete="new-password"
                                     onChange={(e) => setAsiKeyInput(e.target.value)}
-                                    className="flex-1 border border-gray-200 rounded-2xl px-3 py-2 text-sm font-mono focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                                    className="flex-1 font-mono text-xs"
                                 />
-                                <button
+                                <Button
                                     type="button"
+                                    variant="secondary"
+                                    size="icon"
                                     onClick={() => setShowAsiKey((prev) => !prev)}
-                                    className="px-3 py-2 rounded-2xl border border-gray-200 text-sm text-gray-600 hover:border-indigo-300"
                                 >
                                     {showAsiKey ? <EyeOff size={14} /> : <Eye size={14} />}
-                                </button>
+                                </Button>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                                <button
+                            <div className="flex gap-2">
+                                <Button
                                     type="button"
+                                    variant="secondary"
+                                    size="sm"
                                     onClick={handleCopyAsiKey}
                                     disabled={!asiKeyInput}
-                                    className="flex items-center gap-1 px-3 py-1 rounded-2xl border border-transparent text-indigo-600 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-40"
+                                    fullWidth
                                 >
-                                    <Copy size={12} />
-                                    Copy key
-                                </button>
-                                <button
+                                    <Copy size={12} className="mr-1" />
+                                    Copy Key
+                                </Button>
+                                <Button
                                     type="button"
+                                    size="sm"
                                     onClick={handleSaveAsiKey}
                                     disabled={!settings || savingKey}
-                                    className="px-3 py-1 rounded-2xl border border-transparent text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40"
+                                    fullWidth
                                 >
-                                    {savingKey ? 'Saving...' : 'Save key'}
-                                </button>
-                                {keyStatus && <span className="text-green-600">{keyStatus}</span>}
+                                    {savingKey ? 'Saving...' : 'Save Key'}
+                                </Button>
                             </div>
-                            <p className="text-xs text-gray-500">
+                            {keyStatus && <p className="text-xs text-success-600 font-semibold">{keyStatus}</p>}
+                            <p className="text-xs text-neutral-500">
                                 {settings?.asi_api_key
-                                    ? 'Stored key is active for AI Studio and quick actions.'
-                                    : 'Blank key falls back to the ASI_ONE_API_KEY environment value.'}
+                                    ? 'Stored key is active for AI Studio.'
+                                    : 'Blank key falls back to ASI_ONE_API_KEY env value.'}
                             </p>
-                        </div>
-                    </article>
-                    <article className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-2xl p-5 shadow-lg">
-                        <p className="text-sm font-semibold">Need automation?</p>
-                        <p className="text-sm mt-1">Call the same `/api/ai` routes from your scripts, Zapier, or Postman. Just include a bearer token from an admin account.</p>
-                    </article>
+                        </CardContent>
+                    </Card>
+
+                    {/* Info Card */}
+                    <Card className="bg-gradient-to-br from-primary-600 to-primary-700 text-white border-0">
+                        <CardContent className="p-5">
+                            <p className="text-sm font-semibold">Need automation?</p>
+                            <p className="text-xs mt-2 opacity-90">
+                                Call the same `/api/ai` routes from your scripts, Zapier, or Postman. Just include a bearer token.
+                            </p>
+                        </CardContent>
+                    </Card>
                 </div>
             </section>
         </div>

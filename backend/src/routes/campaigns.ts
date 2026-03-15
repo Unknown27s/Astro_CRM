@@ -19,7 +19,7 @@ router.get('/', (req: Request, res: Response) => {
 router.get('/:id', (req: Request, res: Response) => {
     try {
         const campaign = queryOne('SELECT * FROM campaigns WHERE id = ?', [req.params.id]);
-        
+
         if (!campaign) {
             return res.status(404).json({ error: 'Campaign not found' });
         }
@@ -60,7 +60,7 @@ router.get('/:id/sends', (req: Request, res: Response) => {
 // Create campaign
 router.post('/', (req: Request, res: Response) => {
     try {
-        const { name, message, target_audience, audience_filter } = req.body;
+        const { name, message, email_subject, campaign_type = 'SMS', target_audience, audience_filter } = req.body;
 
         if (!name?.trim()) {
             return res.status(400).json({ error: 'Campaign name is required' });
@@ -70,16 +70,24 @@ router.post('/', (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Campaign message is required' });
         }
 
+        if (campaign_type === 'Email' && !email_subject?.trim()) {
+            return res.status(400).json({ error: 'Email subject is required for email campaigns' });
+        }
+
         if (!target_audience) {
             return res.status(400).json({ error: 'Target audience is required' });
+        }
+
+        if (!['SMS', 'Email', 'Both'].includes(campaign_type)) {
+            return res.status(400).json({ error: 'Campaign type must be SMS, Email, or Both' });
         }
 
         const filterJson = audience_filter ? JSON.stringify(audience_filter) : null;
 
         const result = execute(
-            `INSERT INTO campaigns (name, message, target_audience, audience_filter, status)
-             VALUES (?, ?, ?, ?, ?)`,
-            [name, message, target_audience, filterJson, 'Draft']
+            `INSERT INTO campaigns (name, message, email_subject, campaign_type, target_audience, audience_filter, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [name, message, email_subject || null, campaign_type, target_audience, filterJson, 'Draft']
         );
 
         const campaign = queryOne('SELECT * FROM campaigns WHERE id = ?', [result.lastInsertRowid]);
@@ -93,7 +101,7 @@ router.post('/', (req: Request, res: Response) => {
 router.post('/:id/preview', (req: Request, res: Response) => {
     try {
         const campaign = queryOne('SELECT * FROM campaigns WHERE id = ?', [req.params.id]);
-        
+
         if (!campaign) {
             return res.status(404).json({ error: 'Campaign not found' });
         }
@@ -101,7 +109,7 @@ router.post('/:id/preview', (req: Request, res: Response) => {
         const { target_audience, audience_filter } = campaign as any;
         const recipients = getAudienceCustomers(target_audience, audience_filter);
 
-        res.json({ 
+        res.json({
             count: recipients.length,
             recipients: recipients.slice(0, 10), // Preview first 10
             message_preview: replacePlaceholders((campaign as any).message, recipients[0] || {})
@@ -115,7 +123,7 @@ router.post('/:id/preview', (req: Request, res: Response) => {
 router.post('/:id/send', (req: Request, res: Response) => {
     try {
         const campaign = queryOne('SELECT * FROM campaigns WHERE id = ?', [req.params.id]);
-        
+
         if (!campaign) {
             return res.status(404).json({ error: 'Campaign not found' });
         }
@@ -124,7 +132,7 @@ router.post('/:id/send', (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Campaign already sent' });
         }
 
-        const { target_audience, audience_filter, message } = campaign as any;
+        const { target_audience, audience_filter, message, email_subject, campaign_type = 'SMS' } = campaign as any;
         const recipients = getAudienceCustomers(target_audience, audience_filter);
 
         if (recipients.length === 0) {
@@ -134,13 +142,26 @@ router.post('/:id/send', (req: Request, res: Response) => {
         let sentCount = 0;
         transaction(() => {
             recipients.forEach((customer: any) => {
-                if (customer.phone) {
+                // Send SMS
+                if ((campaign_type === 'SMS' || campaign_type === 'Both') && customer.phone) {
                     const personalizedMessage = replacePlaceholders(message, customer);
-                    
+
                     execute(
-                        `INSERT INTO campaign_sends (campaign_id, customer_id, phone, message, status)
-                         VALUES (?, ?, ?, ?, ?)`,
-                        [req.params.id, customer.id, customer.phone, personalizedMessage, 'Sent']
+                        `INSERT INTO campaign_sends (campaign_id, customer_id, phone, message, campaign_type, status)
+                         VALUES (?, ?, ?, ?, ?, ?)`,
+                        [req.params.id, customer.id, customer.phone, personalizedMessage, 'SMS', 'Sent']
+                    );
+                    sentCount++;
+                }
+
+                // Send Email
+                if ((campaign_type === 'Email' || campaign_type === 'Both') && customer.email) {
+                    const personalizedMessage = replacePlaceholders(message, customer);
+
+                    execute(
+                        `INSERT INTO campaign_sends (campaign_id, customer_id, email, message, campaign_type, status)
+                         VALUES (?, ?, ?, ?, ?, ?)`,
+                        [req.params.id, customer.id, customer.email, personalizedMessage, 'Email', 'Sent']
                     );
                     sentCount++;
                 }
@@ -153,9 +174,10 @@ router.post('/:id/send', (req: Request, res: Response) => {
             );
         });
 
-        res.json({ 
-            message: `Campaign sent to ${sentCount} customers`,
-            sent_count: sentCount
+        res.json({
+            message: `Campaign sent via ${campaign_type} to ${sentCount} recipients`,
+            sent_count: sentCount,
+            campaign_type
         });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

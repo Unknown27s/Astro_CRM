@@ -21,6 +21,8 @@ import shopRouter from './routes/shop';
 import couponsRouter from './routes/coupons';
 import chatRouter from './routes/chat';
 import aiRouter from './routes/ai';
+import inventoryRouter from './routes/inventory';
+import googleSheetsRouter from './routes/google-sheets';
 import { getAsiClient } from './routes/aihelper';
 
 dotenv.config();
@@ -88,6 +90,8 @@ app.use('/api/shop', shopRouter);
 app.use('/api/coupons', couponsRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/ai', aiRouter);
+app.use('/api/inventory', inventoryRouter);
+app.use('/api/google-sheets', googleSheetsRouter);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {

@@ -35,7 +35,7 @@ router.get('/', (req: Request, res: Response) => {
         params.push(Math.min(Number(limit) || 100, 1000));
 
         const purchases = query(sql, params);
-        
+
         // Parse items JSON
         const formattedPurchases = purchases.map((p: any) => ({
             ...p,
@@ -52,7 +52,7 @@ router.get('/', (req: Request, res: Response) => {
 router.get('/recent', (req: Request, res: Response) => {
     try {
         const { limit = '10' } = req.query;
-        
+
         const purchases = query(
             `SELECT p.*, c.name as customer_name, c.phone as customer_phone
              FROM purchases p
@@ -89,8 +89,8 @@ router.post('/', (req: Request, res: Response) => {
         // Validate items structure
         for (const item of items) {
             if (!item.name || item.qty === undefined || item.price === undefined) {
-                return res.status(400).json({ 
-                    error: 'Each item must have name, qty, and price' 
+                return res.status(400).json({
+                    error: 'Each item must have name, qty, and price'
                 });
             }
         }
@@ -107,22 +107,37 @@ router.post('/', (req: Request, res: Response) => {
 
         const purchaseDateValue = purchase_date || new Date().toISOString().split('T')[0];
 
-        const result = execute(
-            `INSERT INTO purchases (customer_id, items, total_amount, payment_method, purchase_date, notes)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [customer_id, JSON.stringify(items), total_amount, payment_method, purchaseDateValue, notes]
-        );
+        try {
+            const result = execute(
+                `INSERT INTO purchases (customer_id, items, total_amount, payment_method, purchase_date, notes)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [customer_id, JSON.stringify(items), total_amount, payment_method || null, purchaseDateValue, notes || null]
+            );
 
-        // Update customer aggregates
-        updateCustomerAggregates(customer_id);
+            // Update customer aggregates - wrap in try-catch to prevent cascading failures
+            try {
+                updateCustomerAggregates(customer_id);
+            } catch (aggregateError: any) {
+                console.warn('Warning updating aggregates:', aggregateError.message);
+                // Don't fail the purchase if aggregates fail
+            }
 
-        const purchase = queryOne('SELECT * FROM purchases WHERE id = ?', [result.lastInsertRowid]);
-        res.status(201).json({
-            ...purchase,
-            items: JSON.parse((purchase as any).items || '[]')
-        });
+            const purchase = queryOne('SELECT * FROM purchases WHERE id = ?', [result.lastInsertRowid]);
+            if (!purchase) {
+                return res.status(500).json({ error: 'Failed to retrieve created purchase' });
+            }
+
+            res.status(201).json({
+                ...purchase,
+                items: JSON.parse((purchase as any).items || '[]')
+            });
+        } catch (dbError: any) {
+            console.error('Database error creating purchase:', dbError);
+            return res.status(500).json({ error: 'Failed to create purchase: ' + dbError.message });
+        }
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        console.error('Purchase creation error:', error);
+        res.status(500).json({ error: error.message || 'Internal server error' });
     }
 });
 
@@ -136,29 +151,55 @@ router.put('/:id', (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Purchase not found' });
         }
 
+        // Validate items if provided
+        if (items && Array.isArray(items)) {
+            for (const item of items) {
+                if (!item.name || item.qty === undefined || item.price === undefined) {
+                    return res.status(400).json({
+                        error: 'Each item must have name, qty, and price'
+                    });
+                }
+            }
+        }
+
         const itemsJson = items ? JSON.stringify(items) : (purchase as any).items;
 
-        execute(
-            `UPDATE purchases 
-             SET items = ?,
-                 total_amount = COALESCE(?, total_amount),
-                 payment_method = COALESCE(?, payment_method),
-                 purchase_date = COALESCE(?, purchase_date),
-                 notes = COALESCE(?, notes)
-             WHERE id = ?`,
-            [itemsJson, total_amount, payment_method, purchase_date, notes, req.params.id]
-        );
+        try {
+            execute(
+                `UPDATE purchases
+                 SET items = ?,
+                     total_amount = COALESCE(?, total_amount),
+                     payment_method = COALESCE(?, payment_method),
+                     purchase_date = COALESCE(?, purchase_date),
+                     notes = COALESCE(?, notes)
+                 WHERE id = ?`,
+                [itemsJson, total_amount, payment_method || null, purchase_date, notes || null, req.params.id]
+            );
 
-        // Update customer aggregates
-        updateCustomerAggregates((purchase as any).customer_id);
+            // Update customer aggregates - wrap in try-catch to prevent cascading failures
+            try {
+                updateCustomerAggregates((purchase as any).customer_id);
+            } catch (aggregateError: any) {
+                console.warn('Warning updating aggregates:', aggregateError.message);
+                // Don't fail the update if aggregates fail
+            }
 
-        const updated = queryOne('SELECT * FROM purchases WHERE id = ?', [req.params.id]);
-        res.json({
-            ...updated,
-            items: JSON.parse((updated as any).items || '[]')
-        });
+            const updated = queryOne('SELECT * FROM purchases WHERE id = ?', [req.params.id]);
+            if (!updated) {
+                return res.status(500).json({ error: 'Failed to retrieve updated purchase' });
+            }
+
+            res.json({
+                ...updated,
+                items: JSON.parse((updated as any).items || '[]')
+            });
+        } catch (dbError: any) {
+            console.error('Database error updating purchase:', dbError);
+            return res.status(500).json({ error: 'Failed to update purchase: ' + dbError.message });
+        }
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        console.error('Purchase update error:', error);
+        res.status(500).json({ error: error.message || 'Internal server error' });
     }
 });
 
@@ -171,9 +212,9 @@ router.delete('/:id', (req: Request, res: Response) => {
         }
 
         const customerId = (purchase as any).customer_id;
-        
+
         execute('DELETE FROM purchases WHERE id = ?', [req.params.id]);
-        
+
         // Update customer aggregates
         updateCustomerAggregates(customerId);
 
@@ -185,49 +226,54 @@ router.delete('/:id', (req: Request, res: Response) => {
 
 // Helper function to update customer aggregates
 function updateCustomerAggregates(customerId: number) {
-    const purchases = query('SELECT * FROM purchases WHERE customer_id = ?', [customerId]);
+    try {
+        const purchases = query('SELECT * FROM purchases WHERE customer_id = ?', [customerId]);
 
-    if (purchases.length > 0) {
-        const totalSpent = purchases.reduce((sum, p: any) => sum + p.total_amount, 0);
-        const totalPurchases = purchases.length;
-        const purchaseDates = purchases
-            .map((p: any) => p.purchase_date)
-            .filter(Boolean)
-            .sort();
-        
-        const firstPurchase = purchaseDates[0];
-        const lastPurchase = purchaseDates[purchaseDates.length - 1];
+        if (purchases.length > 0) {
+            const totalSpent = purchases.reduce((sum, p: any) => sum + (p.total_amount || 0), 0);
+            const totalPurchases = purchases.length;
+            const purchaseDates = purchases
+                .map((p: any) => p.purchase_date)
+                .filter(Boolean)
+                .sort();
 
-        // Determine status
-        let status = 'Active';
-        if (lastPurchase) {
-            const daysSinceLastPurchase = Math.floor(
-                (Date.now() - new Date(lastPurchase).getTime()) / (1000 * 60 * 60 * 24)
-            );
-            if (daysSinceLastPurchase > 90) {
-                status = 'Inactive';
+            const firstPurchase = purchaseDates[0] || null;
+            const lastPurchase = purchaseDates[purchaseDates.length - 1] || null;
+
+            // Determine status
+            let status = 'Active';
+            if (lastPurchase) {
+                const daysSinceLastPurchase = Math.floor(
+                    (Date.now() - new Date(lastPurchase).getTime()) / (1000 * 60 * 60 * 24)
+                );
+                if (daysSinceLastPurchase > 90) {
+                    status = 'Inactive';
+                }
             }
-        }
-        if (totalSpent >= 50000) {
-            status = 'VIP';
-        }
+            if (totalSpent >= 50000) {
+                status = 'VIP';
+            }
 
-        execute(
-            `UPDATE customers 
-             SET total_spent = ?, total_purchases = ?, 
-                 first_purchase_date = ?, last_purchase_date = ?, status = ?
-             WHERE id = ?`,
-            [totalSpent, totalPurchases, firstPurchase, lastPurchase, status, customerId]
-        );
-    } else {
-        // No purchases, reset aggregates
-        execute(
-            `UPDATE customers 
-             SET total_spent = 0, total_purchases = 0, 
-                 first_purchase_date = NULL, last_purchase_date = NULL
-             WHERE id = ?`,
-            [customerId]
-        );
+            execute(
+                `UPDATE customers
+                 SET total_spent = ?, total_purchases = ?,
+                     first_purchase_date = ?, last_purchase_date = ?, status = ?
+                 WHERE id = ?`,
+                [totalSpent, totalPurchases, firstPurchase, lastPurchase, status, customerId]
+            );
+        } else {
+            // No purchases, reset aggregates
+            execute(
+                `UPDATE customers
+                 SET total_spent = 0, total_purchases = 0,
+                     first_purchase_date = NULL, last_purchase_date = NULL
+                 WHERE id = ?`,
+                [customerId]
+            );
+        }
+    } catch (error: any) {
+        console.error('Error updating customer aggregates:', error);
+        throw error;
     }
 }
 
