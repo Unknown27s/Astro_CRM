@@ -49,9 +49,9 @@ export default function Shop() {
         return matchSearch && matchCat;
     });
 
-    const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+    const cartTotal = cart.reduce((s, i) => s + Number(i.price || 0) * Number(i.qty || 0), 0);
     const cartCount = cart.reduce((s, i) => s + i.qty, 0);
-    const discountAmount = appliedCoupon?.discount_amount || 0;
+    const discountAmount = Number(appliedCoupon?.discount_amount || 0);
     const finalTotal = Math.max(0, cartTotal - discountAmount);
 
     const addToCart = (product: any) => {
@@ -394,7 +394,7 @@ export default function Shop() {
                                     )}
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-medium text-gray-800 truncate">{item.name}</p>
-                                        <p className="text-sm font-bold" style={{ color: primaryColor }}>{currency}{(item.price * item.qty).toFixed(0)}</p>
+                                        <p className="text-sm font-bold" style={{ color: primaryColor }}>{currency}{(Number(item.price || 0) * Number(item.qty || 0)).toFixed(0)}</p>
                                     </div>
                                     <div className="flex items-center gap-1.5">
                                         <button onClick={() => updateQty(item.id, -1)}
@@ -493,7 +493,7 @@ export default function Shop() {
                                 {cart.map(item => (
                                     <div key={item.id} className="flex justify-between text-sm text-gray-700">
                                         <span>{item.name} x {item.qty}</span>
-                                        <span className="font-medium">{currency}{(item.price * item.qty).toFixed(0)}</span>
+                                        <span className="font-medium">{currency}{(Number(item.price || 0) * Number(item.qty || 0)).toFixed(0)}</span>
                                     </div>
                                 ))}
                                 {discountAmount > 0 && (

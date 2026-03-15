@@ -4,7 +4,7 @@ import { query, queryOne, execute } from '../database/db';
 const router = Router();
 
 // Get all sales
-router.get('/', (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
     try {
         const { start_date, end_date, region, category, limit = '1000' } = req.query;
 
@@ -39,7 +39,7 @@ router.get('/', (req: Request, res: Response) => {
         sql += ' ORDER BY s.sale_date DESC LIMIT ?';
         params.push(Number(limit));
 
-        const sales = query(sql, params);
+        const sales = await query(sql, params);
         res.json({ sales });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -47,7 +47,7 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // Create sale
-router.post('/', (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response) => {
     try {
         const {
             contact_id, deal_id, product_name, quantity, unit_price,
@@ -66,7 +66,7 @@ router.post('/', (req: Request, res: Response) => {
             : quantityNumber * unitPriceNumber;
         const saleDateValue = sale_date || new Date().toISOString().split('T')[0];
 
-        const result = execute(
+        const result = await execute(
             `INSERT INTO sales (
         contact_id, deal_id, product_name, quantity, unit_price,
         total_amount, sale_date, region, category
@@ -75,7 +75,7 @@ router.post('/', (req: Request, res: Response) => {
                 totalAmountNumber, saleDateValue, region, category]
         );
 
-        const sale = queryOne('SELECT * FROM sales WHERE id = ?', [result.lastInsertRowid]);
+        const sale = await queryOne('SELECT * FROM sales WHERE id = ?', [result.lastInsertRowid]);
         res.status(201).json(sale);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -83,12 +83,12 @@ router.post('/', (req: Request, res: Response) => {
 });
 
 // Get sales statistics
-router.get('/stats/summary', (req: Request, res: Response) => {
+router.get('/stats/summary', async (req: Request, res: Response) => {
     try {
         const { start_date, end_date } = req.query;
 
         let sql = `
-      SELECT 
+      SELECT
         COUNT(*) as total_sales,
         SUM(total_amount) as total_revenue,
         AVG(total_amount) as avg_sale_value,
@@ -108,7 +108,7 @@ router.get('/stats/summary', (req: Request, res: Response) => {
             params.push(end_date);
         }
 
-        const stats = queryOne(sql, params);
+        const stats = await queryOne(sql, params);
         res.json(stats);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -116,10 +116,10 @@ router.get('/stats/summary', (req: Request, res: Response) => {
 });
 
 // Get sales by region
-router.get('/stats/by-region', (req: Request, res: Response) => {
+router.get('/stats/by-region', async (req: Request, res: Response) => {
     try {
-        const stats = query(`
-      SELECT 
+        const stats = await query(`
+      SELECT
         region,
         COUNT(*) as count,
         SUM(total_amount) as revenue
@@ -135,10 +135,10 @@ router.get('/stats/by-region', (req: Request, res: Response) => {
 });
 
 // Get sales by category
-router.get('/stats/by-category', (req: Request, res: Response) => {
+router.get('/stats/by-category', async (req: Request, res: Response) => {
     try {
-        const stats = query(`
-      SELECT 
+        const stats = await query(`
+      SELECT
         category,
         COUNT(*) as count,
         SUM(total_amount) as revenue

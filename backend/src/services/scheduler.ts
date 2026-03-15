@@ -94,7 +94,9 @@ Rules:
 }
 
 async function getAllCustomers(): Promise<Customer[]> {
-  return query<Customer>(`
+  // PostgreSQL: use EXTRACT(EPOCH FROM ...) instead of julianday()
+  // PostgreSQL: cannot use column aliases in HAVING, use the aggregate expression directly
+  return await query<Customer>(`
     SELECT
       c.id,
       c.name,
@@ -103,23 +105,23 @@ async function getAllCustomers(): Promise<Customer[]> {
       COUNT(DISTINCT p.id) as purchase_count,
       COALESCE(SUM(p.total_amount), 0) as total_value,
       COALESCE(AVG(p.total_amount), 0) as avg_order_value,
-      COALESCE(julianday('now') - julianday(MAX(p.purchase_date)), 9999) as days_since_last_purchase
+      COALESCE(EXTRACT(EPOCH FROM (NOW() - MAX(p.purchase_date::timestamp))) / 86400, 9999) as days_since_last_purchase
     FROM customers c
     LEFT JOIN purchases p ON p.customer_id = c.id
     GROUP BY c.id, c.name, c.phone, c.email
-    HAVING purchase_count > 0
-    ORDER BY total_value DESC
+    HAVING COUNT(DISTINCT p.id) > 0
+    ORDER BY COALESCE(SUM(p.total_amount), 0) DESC
   `);
 }
 
 async function sendSMS(phone: string, message: string): Promise<void> {
   if (!phone) return;
-  console.log(`📲 SMS queued for ${phone}: ${message.slice(0, 80)}...`);
+  console.log(`SMS queued for ${phone}: ${message.slice(0, 80)}...`);
 }
 
 async function sendEmail(email: string, subject: string, body: string): Promise<void> {
   if (!email) return;
-  console.log(`📧 Email queued for ${email}: ${subject} (${body.length} chars)`);
+  console.log(`Email queued for ${email}: ${subject} (${body.length} chars)`);
 }
 
 async function saveCSVReport(jsonText: string, fileName: string): Promise<void> {
@@ -150,14 +152,11 @@ async function savePDFReport(htmlBody: string, fileName: string): Promise<void> 
   await writeFile(join(outputDir, `${fileName}.html`), htmlBody, "utf-8");
 }
 
-// 🔍 Optional debug (remove after testing)
-// console.log("Gemini Key:", process.env.GEMINI_API_KEY);
-
 async function runAutomation() {
-  console.log("🚀 Running AI automation...");
+  console.log("Running AI automation...");
 
   try {
-    // 1️⃣ Fetch customers
+    // 1. Fetch customers
     const allCustomers: Customer[] = await getAllCustomers();
 
     if (!allCustomers || allCustomers.length === 0) {
@@ -170,13 +169,13 @@ async function runAutomation() {
       return;
     }
 
-    // 2️⃣ Prepare ML features
+    // 2. Prepare ML features
     const features = prepareCustomerFeatures(allCustomers);
 
     const k = Math.min(3, features.length);
     const clusters = await performKMeansClustering(features, k);
 
-    // 3️⃣ Identify gold cluster (highest total spend)
+    // 3. Identify gold cluster (highest total spend)
     const clusterTotals = clusters.map((c) => c.centroid[0] || 0);
     const goldClusterIndex = clusterTotals.indexOf(Math.max(...clusterTotals));
 
@@ -185,12 +184,12 @@ async function runAutomation() {
 
     console.log(`Identified ${goldCustomers.length} gold customers.`);
 
-    // 4️⃣ AI Personalized Messaging (single API call for all selected customers)
+    // 4. AI Personalized Messaging (single API call for all selected customers)
     let messageMap = new Map<number, string>();
     try {
       messageMap = await generateBulkPersonalizedMessages(goldCustomers);
     } catch (err) {
-      console.error("❌ Bulk AI message generation failed. Falling back to template messages:", err);
+      console.error("Bulk AI message generation failed. Falling back to template messages:", err);
     }
 
     for (const customer of goldCustomers) {
@@ -205,15 +204,15 @@ async function runAutomation() {
           aiMessage
         );
 
-        console.log(`✅ Sent personalized message to ${customer.name}`);
+        console.log(`Sent personalized message to ${customer.name}`);
       } catch (err) {
-        console.error(`❌ Failed to message ${customer.name}:`, err);
+        console.error(`Failed to message ${customer.name}:`, err);
       }
       // Add a 2s delay between customers to respect API rate limits
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
 
-    // 5️⃣ Generate AI Segmentation Report
+    // 5. Generate AI Segmentation Report
     const reportPrompt = `
 Generate a professional JSON summary report for customer segmentation.
 
@@ -244,10 +243,10 @@ Return strictly the JSON array. Do not include any other markdown or text.
       }
       reportJSON = reportJSON.trim();
     } catch (err) {
-      console.error("❌ AI report generation failed:", err);
+      console.error("AI report generation failed:", err);
     }
 
-    // 6️⃣ Save Reports
+    // 6. Save Reports
     if (reportJSON) {
       try {
         const data = JSON.parse(reportJSON) as ReportItem[];
@@ -284,20 +283,22 @@ Return strictly the JSON array. Do not include any other markdown or text.
         await saveCSVReport(reportJSON, "segmentation_report");
         await savePDFReport(htmlBody, "segmentation_report_pdf");
 
-        console.log("📊 Reports saved successfully.");
+        console.log("Reports saved successfully.");
       } catch (err) {
-        console.error("❌ Failed to save reports:", err);
+        console.error("Failed to save reports:", err);
       }
     }
 
-    console.log("✅ Automation complete!");
+    console.log("Automation complete!");
   } catch (err) {
-    console.error("💥 Automation crashed:", err);
+    console.error("Automation crashed:", err);
   }
 }
 
-// 🕘 Run daily at 9 AM
-cron.schedule("0 9 * * *", runAutomation);
+// Run daily at 9 AM
+cron.schedule("0 9 * * *", async () => {
+  await runAutomation();
+});
 
-// 🔥 Run immediately for testing
+// Run immediately for testing
 runAutomation();

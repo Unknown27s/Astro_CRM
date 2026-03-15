@@ -1,10 +1,10 @@
 import { Router, Request, Response } from 'express';
-import { query, queryOne, execute } from '../database/db';
+import { query, queryOne, execute, parseJsonField } from '../database/db';
 
 const router = Router();
 
 // Get all purchases (with optional customer filter)
-router.get('/', (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
     try {
         const { customer_id, start_date, end_date, limit = '100' } = req.query;
 
@@ -34,12 +34,12 @@ router.get('/', (req: Request, res: Response) => {
         sql += ' ORDER BY p.purchase_date DESC, p.created_at DESC LIMIT ?';
         params.push(Math.min(Number(limit) || 100, 1000));
 
-        const purchases = query(sql, params);
+        const purchases = await query(sql, params);
 
         // Parse items JSON
         const formattedPurchases = purchases.map((p: any) => ({
             ...p,
-            items: JSON.parse(p.items || '[]')
+            items: parseJsonField(p.items)
         }));
 
         res.json({ purchases: formattedPurchases });
@@ -49,11 +49,11 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // Get recent purchases
-router.get('/recent', (req: Request, res: Response) => {
+router.get('/recent', async (req: Request, res: Response) => {
     try {
         const { limit = '10' } = req.query;
 
-        const purchases = query(
+        const purchases = await query(
             `SELECT p.*, c.name as customer_name, c.phone as customer_phone
              FROM purchases p
              LEFT JOIN customers c ON p.customer_id = c.id
@@ -64,7 +64,7 @@ router.get('/recent', (req: Request, res: Response) => {
 
         const formattedPurchases = purchases.map((p: any) => ({
             ...p,
-            items: JSON.parse(p.items || '[]')
+            items: parseJsonField(p.items)
         }));
 
         res.json({ purchases: formattedPurchases });
@@ -74,7 +74,7 @@ router.get('/recent', (req: Request, res: Response) => {
 });
 
 // Create purchase
-router.post('/', (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response) => {
     try {
         const { customer_id, items, total_amount, payment_method, purchase_date, notes } = req.body;
 
@@ -100,7 +100,7 @@ router.post('/', (req: Request, res: Response) => {
         }
 
         // Check if customer exists
-        const customer = queryOne('SELECT * FROM customers WHERE id = ?', [customer_id]);
+        const customer = await queryOne('SELECT * FROM customers WHERE id = ?', [customer_id]);
         if (!customer) {
             return res.status(404).json({ error: 'Customer not found' });
         }
@@ -108,7 +108,7 @@ router.post('/', (req: Request, res: Response) => {
         const purchaseDateValue = purchase_date || new Date().toISOString().split('T')[0];
 
         try {
-            const result = execute(
+            const result = await execute(
                 `INSERT INTO purchases (customer_id, items, total_amount, payment_method, purchase_date, notes)
                  VALUES (?, ?, ?, ?, ?, ?)`,
                 [customer_id, JSON.stringify(items), total_amount, payment_method || null, purchaseDateValue, notes || null]
@@ -116,20 +116,20 @@ router.post('/', (req: Request, res: Response) => {
 
             // Update customer aggregates - wrap in try-catch to prevent cascading failures
             try {
-                updateCustomerAggregates(customer_id);
+                await updateCustomerAggregates(customer_id);
             } catch (aggregateError: any) {
                 console.warn('Warning updating aggregates:', aggregateError.message);
                 // Don't fail the purchase if aggregates fail
             }
 
-            const purchase = queryOne('SELECT * FROM purchases WHERE id = ?', [result.lastInsertRowid]);
+            const purchase = await queryOne('SELECT * FROM purchases WHERE id = ?', [result.lastInsertRowid]);
             if (!purchase) {
                 return res.status(500).json({ error: 'Failed to retrieve created purchase' });
             }
 
             res.status(201).json({
                 ...purchase,
-                items: JSON.parse((purchase as any).items || '[]')
+                items: parseJsonField((purchase as any).items)
             });
         } catch (dbError: any) {
             console.error('Database error creating purchase:', dbError);
@@ -142,11 +142,11 @@ router.post('/', (req: Request, res: Response) => {
 });
 
 // Update purchase
-router.put('/:id', (req: Request, res: Response) => {
+router.put('/:id', async (req: Request, res: Response) => {
     try {
         const { items, total_amount, payment_method, purchase_date, notes } = req.body;
 
-        const purchase = queryOne('SELECT * FROM purchases WHERE id = ?', [req.params.id]);
+        const purchase = await queryOne('SELECT * FROM purchases WHERE id = ?', [req.params.id]);
         if (!purchase) {
             return res.status(404).json({ error: 'Purchase not found' });
         }
@@ -165,7 +165,7 @@ router.put('/:id', (req: Request, res: Response) => {
         const itemsJson = items ? JSON.stringify(items) : (purchase as any).items;
 
         try {
-            execute(
+            await execute(
                 `UPDATE purchases
                  SET items = ?,
                      total_amount = COALESCE(?, total_amount),
@@ -178,20 +178,20 @@ router.put('/:id', (req: Request, res: Response) => {
 
             // Update customer aggregates - wrap in try-catch to prevent cascading failures
             try {
-                updateCustomerAggregates((purchase as any).customer_id);
+                await updateCustomerAggregates((purchase as any).customer_id);
             } catch (aggregateError: any) {
                 console.warn('Warning updating aggregates:', aggregateError.message);
                 // Don't fail the update if aggregates fail
             }
 
-            const updated = queryOne('SELECT * FROM purchases WHERE id = ?', [req.params.id]);
+            const updated = await queryOne('SELECT * FROM purchases WHERE id = ?', [req.params.id]);
             if (!updated) {
                 return res.status(500).json({ error: 'Failed to retrieve updated purchase' });
             }
 
             res.json({
                 ...updated,
-                items: JSON.parse((updated as any).items || '[]')
+                items: parseJsonField((updated as any).items)
             });
         } catch (dbError: any) {
             console.error('Database error updating purchase:', dbError);
@@ -204,19 +204,19 @@ router.put('/:id', (req: Request, res: Response) => {
 });
 
 // Delete purchase
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response) => {
     try {
-        const purchase = queryOne('SELECT * FROM purchases WHERE id = ?', [req.params.id]);
+        const purchase = await queryOne('SELECT * FROM purchases WHERE id = ?', [req.params.id]);
         if (!purchase) {
             return res.status(404).json({ error: 'Purchase not found' });
         }
 
         const customerId = (purchase as any).customer_id;
 
-        execute('DELETE FROM purchases WHERE id = ?', [req.params.id]);
+        await execute('DELETE FROM purchases WHERE id = ?', [req.params.id]);
 
         // Update customer aggregates
-        updateCustomerAggregates(customerId);
+        await updateCustomerAggregates(customerId);
 
         res.json({ message: 'Purchase deleted successfully' });
     } catch (error: any) {
@@ -225,9 +225,9 @@ router.delete('/:id', (req: Request, res: Response) => {
 });
 
 // Helper function to update customer aggregates
-function updateCustomerAggregates(customerId: number) {
+async function updateCustomerAggregates(customerId: number) {
     try {
-        const purchases = query('SELECT * FROM purchases WHERE customer_id = ?', [customerId]);
+        const purchases = await query('SELECT * FROM purchases WHERE customer_id = ?', [customerId]);
 
         if (purchases.length > 0) {
             const totalSpent = purchases.reduce((sum, p: any) => sum + (p.total_amount || 0), 0);
@@ -254,7 +254,7 @@ function updateCustomerAggregates(customerId: number) {
                 status = 'VIP';
             }
 
-            execute(
+            await execute(
                 `UPDATE customers
                  SET total_spent = ?, total_purchases = ?,
                      first_purchase_date = ?, last_purchase_date = ?, status = ?
@@ -263,7 +263,7 @@ function updateCustomerAggregates(customerId: number) {
             );
         } else {
             // No purchases, reset aggregates
-            execute(
+            await execute(
                 `UPDATE customers
                  SET total_spent = 0, total_purchases = 0,
                      first_purchase_date = NULL, last_purchase_date = NULL

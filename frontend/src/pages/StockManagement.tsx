@@ -378,7 +378,7 @@ export default function StockManagement() {
                                             <div className="grid grid-cols-3 gap-2 text-xs text-neutral-600">
                                                 <div>
                                                     <p className="font-medium">Price</p>
-                                                    <p>₹{product.selling_price.toFixed(2)}</p>
+                                                    <p>₹{Number(product.selling_price || 0).toFixed(2)}</p>
                                                 </div>
                                                 <div>
                                                     <p className="font-medium">Min/Max</p>

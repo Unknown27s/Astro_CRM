@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
-import { query } from '../database/db';
+import { query, parseJsonField } from '../database/db';
 import { generateInsights } from './aihelper';
 
 const router = Router();
@@ -143,7 +143,7 @@ router.post('/sales', async (req: Request, res: Response) => {
 
         sql += ' ORDER BY p.purchase_date DESC';
 
-        const salesData = query(sql, params);
+        const salesData = await query(sql, params);
 
         // Calculate summary statistics
         const totalRevenue = salesData.reduce((sum, s: any) => sum + (s.total_amount || 0), 0);
@@ -274,9 +274,9 @@ router.post('/customers', async (req: Request, res: Response) => {
             params.push(segment_id);
         }
 
-        sql += ' GROUP BY c.id ORDER BY total_revenue DESC';
+        sql += ' GROUP BY c.id, cs.segment_name ORDER BY total_revenue DESC';
 
-        const customerData = query(sql, params);
+        const customerData = await query(sql, params);
 
         if (format === 'excel') {
             const customerRows = customerData.map((c: any) => ({
@@ -304,14 +304,14 @@ router.post('/segments', async (req: Request, res: Response) => {
     try {
         const { format = 'json' } = req.body;
 
-        const segmentData = query(`
-      SELECT 
+        const segmentData = await query(`
+      SELECT
         cs.segment_id,
         cs.segment_name,
         COUNT(DISTINCT cs.customer_id) as customer_count,
-        AVG(json_extract(cs.features, '$.total_value')) as avg_customer_value,
-        AVG(json_extract(cs.features, '$.purchase_count')) as avg_purchase_frequency,
-        AVG(json_extract(cs.features, '$.days_since_last_purchase')) as avg_recency
+        AVG((cs.features::jsonb->>'total_value')::float) as avg_customer_value,
+        AVG((cs.features::jsonb->>'purchase_count')::float) as avg_purchase_frequency,
+        AVG((cs.features::jsonb->>'days_since_last_purchase')::float) as avg_recency
       FROM customer_segments cs
       GROUP BY cs.segment_id, cs.segment_name
       ORDER BY cs.segment_id
@@ -345,22 +345,22 @@ router.post('/monthly', async (req: Request, res: Response) => {
         const monthPrefix = `${yearStr}-${monthStr}`;
 
         // Daily revenue for the month
-        const dailyRevenue = query(
-            `SELECT DATE(purchase_date) as date, COUNT(*) as purchase_count, SUM(total_amount) as revenue
+        const dailyRevenue = await query(
+            `SELECT purchase_date::date as date, COUNT(*) as purchase_count, SUM(total_amount) as revenue
              FROM purchases
-             WHERE strftime('%Y-%m', purchase_date) = ?
-             GROUP BY DATE(purchase_date)
+             WHERE TO_CHAR(purchase_date, 'YYYY-MM') = ?
+             GROUP BY purchase_date::date
              ORDER BY date ASC`,
             [monthPrefix]
         );
 
         // Monthly summary
-        const summary = query(
+        const summary = (await query(
             `SELECT COUNT(*) as total_purchases, SUM(total_amount) as total_revenue, AVG(total_amount) as avg_transaction
              FROM purchases
-             WHERE strftime('%Y-%m', purchase_date) = ?`,
+             WHERE TO_CHAR(purchase_date, 'YYYY-MM') = ?`,
             [monthPrefix]
-        )[0];
+        ))[0];
 
         // Previous month for comparison
         const prevDate = new Date(Number(yearStr), Number(monthStr) - 2, 1);
@@ -368,75 +368,75 @@ router.post('/monthly', async (req: Request, res: Response) => {
         const prevYearStr = String(prevDate.getFullYear());
         const prevMonthPrefix = `${prevYearStr}-${prevMonthStr}`;
 
-        const prevSummary = query(
-            `SELECT SUM(total_amount) as total_revenue FROM purchases WHERE strftime('%Y-%m', purchase_date) = ?`,
+        const prevSummary = (await query(
+            `SELECT SUM(total_amount) as total_revenue FROM purchases WHERE TO_CHAR(purchase_date, 'YYYY-MM') = ?`,
             [prevMonthPrefix]
-        )[0];
+        ))[0];
 
         const currentRevenue = (summary as any)?.total_revenue || 0;
         const prevRevenue = (prevSummary as any)?.total_revenue || 0;
         const growth = prevRevenue > 0 ? ((currentRevenue - prevRevenue) / prevRevenue) * 100 : 0;
 
         // Customer stats
-        const customerStats = query(
+        const customerStats = (await query(
             `SELECT
                 COUNT(*) as total_customers,
                 COUNT(CASE WHEN status = 'Active' THEN 1 END) as active_customers,
                 COUNT(CASE WHEN status = 'VIP' THEN 1 END) as vip_customers,
                 COUNT(CASE WHEN status = 'Inactive' THEN 1 END) as inactive_customers
              FROM customers`
-        )[0];
+        ))[0];
 
         // New customers this month
-        const newCustomers = query(
-            `SELECT COUNT(*) as count FROM customers WHERE strftime('%Y-%m', created_at) = ?`,
+        const newCustomers = (await query(
+            `SELECT COUNT(*) as count FROM customers WHERE TO_CHAR(created_at, 'YYYY-MM') = ?`,
             [monthPrefix]
-        )[0];
+        ))[0];
 
         // Top customers this month
-        const topCustomers = query(
+        const topCustomers = await query(
             `SELECT c.name, c.phone, c.location, SUM(p.total_amount) as spent, COUNT(p.id) as purchases
              FROM purchases p
              LEFT JOIN customers c ON p.customer_id = c.id
-             WHERE strftime('%Y-%m', p.purchase_date) = ?
-             GROUP BY p.customer_id
+             WHERE TO_CHAR(p.purchase_date, 'YYYY-MM') = ?
+             GROUP BY p.customer_id, c.name, c.phone, c.location
              ORDER BY spent DESC
              LIMIT 10`,
             [monthPrefix]
         );
 
         // Purchase by day of week
-        const byDayOfWeek = query(
+        const byDayOfWeek = await query(
             `SELECT
-                CASE CAST(strftime('%w', purchase_date) AS INTEGER)
+                CASE EXTRACT(DOW FROM purchase_date::timestamp)::int
                     WHEN 0 THEN 'Sun' WHEN 1 THEN 'Mon' WHEN 2 THEN 'Tue'
                     WHEN 3 THEN 'Wed' WHEN 4 THEN 'Thu' WHEN 5 THEN 'Fri' WHEN 6 THEN 'Sat'
                 END as day_name,
                 COUNT(*) as purchase_count,
                 SUM(total_amount) as revenue
              FROM purchases
-             WHERE strftime('%Y-%m', purchase_date) = ?
-             GROUP BY strftime('%w', purchase_date)
-             ORDER BY CAST(strftime('%w', purchase_date) AS INTEGER)`,
+             WHERE TO_CHAR(purchase_date, 'YYYY-MM') = ?
+             GROUP BY EXTRACT(DOW FROM purchase_date::timestamp)
+             ORDER BY EXTRACT(DOW FROM purchase_date::timestamp)::int`,
             [monthPrefix]
         );
 
         // Payment methods
-        const byPaymentMethod = query(
+        const byPaymentMethod = await query(
             `SELECT COALESCE(payment_method, 'Unknown') as payment_method, COUNT(*) as count, SUM(total_amount) as revenue
              FROM purchases
-             WHERE strftime('%Y-%m', purchase_date) = ?
+             WHERE TO_CHAR(purchase_date, 'YYYY-MM') = ?
              GROUP BY payment_method
              ORDER BY count DESC`,
             [monthPrefix]
         );
 
         // Revenue by location
-        const byLocation = query(
+        const byLocation = await query(
             `SELECT COALESCE(c.location, 'Unknown') as location, COUNT(p.id) as purchase_count, SUM(p.total_amount) as revenue
              FROM purchases p
              LEFT JOIN customers c ON p.customer_id = c.id
-             WHERE strftime('%Y-%m', p.purchase_date) = ?
+             WHERE TO_CHAR(p.purchase_date, 'YYYY-MM') = ?
              GROUP BY c.location
              ORDER BY revenue DESC
              LIMIT 8`,
@@ -444,22 +444,22 @@ router.post('/monthly', async (req: Request, res: Response) => {
         );
 
         // Top items this month
-        const purchasesForItems = query(
-            `SELECT items FROM purchases WHERE strftime('%Y-%m', purchase_date) = ?`,
+        const purchasesForItems = await query(
+            `SELECT items FROM purchases WHERE TO_CHAR(purchase_date, 'YYYY-MM') = ?`,
             [monthPrefix]
         );
 
         const itemCounts: Record<string, { count: number; revenue: number }> = {};
         (purchasesForItems as any[]).forEach((p) => {
             try {
-                const items = JSON.parse(p.items || '[]');
+                const items = parseJsonField(p.items);
                 items.forEach((item: any) => {
                     const name = item.name || 'Unknown';
                     if (!itemCounts[name]) itemCounts[name] = { count: 0, revenue: 0 };
                     itemCounts[name].count += item.qty || 1;
                     itemCounts[name].revenue += (item.qty || 1) * (item.price || 0);
                 });
-            } catch (e) {}
+            } catch (e) { }
         });
 
         const topItems = Object.entries(itemCounts)
@@ -524,97 +524,97 @@ router.post('/monthly/download', async (req: Request, res: Response) => {
         const yearStr = String(year);
         const monthPrefix = `${yearStr}-${monthStr}`;
 
-        const dailyRevenue = query(
-            `SELECT DATE(purchase_date) as date, COUNT(*) as purchase_count, SUM(total_amount) as revenue
+        const dailyRevenue = await query(
+            `SELECT purchase_date::date as date, COUNT(*) as purchase_count, SUM(total_amount) as revenue
              FROM purchases
-             WHERE strftime('%Y-%m', purchase_date) = ?
-             GROUP BY DATE(purchase_date)
+             WHERE TO_CHAR(purchase_date, 'YYYY-MM') = ?
+             GROUP BY purchase_date::date
              ORDER BY date ASC`,
             [monthPrefix]
         );
 
-        const summary = query(
+        const summary = (await query(
             `SELECT COUNT(*) as total_purchases, SUM(total_amount) as total_revenue, AVG(total_amount) as avg_transaction
              FROM purchases
-             WHERE strftime('%Y-%m', purchase_date) = ?`,
+             WHERE TO_CHAR(purchase_date, 'YYYY-MM') = ?`,
             [monthPrefix]
-        )[0];
+        ))[0];
 
         const prevDate = new Date(Number(yearStr), Number(monthStr) - 2, 1);
         const prevMonthStr = String(prevDate.getMonth() + 1).padStart(2, '0');
         const prevYearStr = String(prevDate.getFullYear());
         const prevMonthPrefix = `${prevYearStr}-${prevMonthStr}`;
 
-        const prevSummary = query(
-            `SELECT SUM(total_amount) as total_revenue FROM purchases WHERE strftime('%Y-%m', purchase_date) = ?`,
+        const prevSummary = (await query(
+            `SELECT SUM(total_amount) as total_revenue FROM purchases WHERE TO_CHAR(purchase_date, 'YYYY-MM') = ?`,
             [prevMonthPrefix]
-        )[0];
+        ))[0];
 
         const currentRevenue = (summary as any)?.total_revenue || 0;
         const prevRevenue = (prevSummary as any)?.total_revenue || 0;
         const growth = prevRevenue > 0 ? ((currentRevenue - prevRevenue) / prevRevenue) * 100 : 0;
 
-        const customerStats = query(
+        const customerStats = (await query(
             `SELECT
                 COUNT(*) as total_customers,
                 COUNT(CASE WHEN status = 'Active' THEN 1 END) as active_customers,
                 COUNT(CASE WHEN status = 'VIP' THEN 1 END) as vip_customers,
                 COUNT(CASE WHEN status = 'Inactive' THEN 1 END) as inactive_customers
              FROM customers`
-        )[0];
+        ))[0];
 
-        const newCustomers = query(
-            `SELECT COUNT(*) as count FROM customers WHERE strftime('%Y-%m', created_at) = ?`,
+        const newCustomers = (await query(
+            `SELECT COUNT(*) as count FROM customers WHERE TO_CHAR(created_at, 'YYYY-MM') = ?`,
             [monthPrefix]
-        )[0];
+        ))[0];
 
-        const topCustomers = query(
+        const topCustomers = await query(
             `SELECT c.name, c.phone, c.location, SUM(p.total_amount) as spent, COUNT(p.id) as purchases
              FROM purchases p
              LEFT JOIN customers c ON p.customer_id = c.id
-             WHERE strftime('%Y-%m', p.purchase_date) = ?
-             GROUP BY p.customer_id
+             WHERE TO_CHAR(p.purchase_date, 'YYYY-MM') = ?
+             GROUP BY p.customer_id, c.name, c.phone, c.location
              ORDER BY spent DESC
              LIMIT 10`,
             [monthPrefix]
         );
 
-        const byPaymentMethod = query(
+        const byPaymentMethod = await query(
             `SELECT COALESCE(payment_method, 'Unknown') as payment_method, COUNT(*) as count, SUM(total_amount) as revenue
              FROM purchases
-             WHERE strftime('%Y-%m', purchase_date) = ?
+             WHERE TO_CHAR(purchase_date, 'YYYY-MM') = ?
              GROUP BY payment_method
              ORDER BY count DESC`,
             [monthPrefix]
         );
 
-        const byLocation = query(
+        const byLocation = await query(
             `SELECT COALESCE(c.location, 'Unknown') as location, COUNT(p.id) as purchase_count, SUM(p.total_amount) as revenue
              FROM purchases p
              LEFT JOIN customers c ON p.customer_id = c.id
-             WHERE strftime('%Y-%m', p.purchase_date) = ?
+             WHERE TO_CHAR(p.purchase_date, 'YYYY-MM') = ?
              GROUP BY c.location
              ORDER BY revenue DESC
              LIMIT 8`,
             [monthPrefix]
         );
 
-        const purchasesForItems = query(
-            `SELECT items FROM purchases WHERE strftime('%Y-%m', purchase_date) = ?`,
+        const purchasesForItems = await query(
+            `SELECT items FROM purchases WHERE TO_CHAR(purchase_date, 'YYYY-MM') = ?`,
             [monthPrefix]
         );
 
         const itemCounts: Record<string, { count: number; revenue: number }> = {};
         (purchasesForItems as any[]).forEach((p) => {
             try {
-                const items = JSON.parse(p.items || '[]');
+                const items = parseJsonField(p.items);
                 items.forEach((item: any) => {
                     const name = item.name || 'Unknown';
                     if (!itemCounts[name]) itemCounts[name] = { count: 0, revenue: 0 };
                     itemCounts[name].count += item.qty || 1;
                     itemCounts[name].revenue += (item.qty || 1) * (item.price || 0);
                 });
-            } catch (e) {}
+            } catch (e) { }
         });
 
         const topItems = Object.entries(itemCounts)

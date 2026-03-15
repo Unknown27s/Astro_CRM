@@ -254,7 +254,7 @@ export default function OnlineStore() {
     };
 
     const pendingOrders = orders.filter(o => o.status === 'Pending').length;
-    const totalOrderValue = orders.reduce((s, o) => s + (o.total_amount || 0), 0);
+    const totalOrderValue = orders.reduce((s, o) => s + Number(o.total_amount || 0), 0);
 
     return (
         <div className="space-y-6">
@@ -650,8 +650,7 @@ export default function OnlineStore() {
                             ) : (
                                 <div className="space-y-3">
                                     {orders.map(o => {
-                                        let items: any[] = [];
-                                        try { items = JSON.parse(o.items || '[]'); } catch (_) {}
+                                        const items: any[] = Array.isArray(o.items) ? o.items : (() => { try { return JSON.parse(o.items || '[]'); } catch (_) { return []; } })();
                                         const isExpanded = expandedOrder === o.id;
                                         return (
                                             <div key={o.id} className="border border-gray-200 rounded-xl overflow-hidden">
@@ -692,7 +691,7 @@ export default function OnlineStore() {
                                                                 {items.map((item: any, idx: number) => (
                                                                     <div key={idx} className="flex justify-between text-sm text-gray-700">
                                                                         <span>{item.name} × {item.qty}</span>
-                                                                        <span className="font-medium">₹{(item.price * item.qty).toFixed(0)}</span>
+                                                                        <span className="font-medium">₹{(Number(item.price || 0) * Number(item.qty || 0)).toFixed(0)}</span>
                                                                     </div>
                                                                 ))}
                                                                 <div className="flex justify-between font-bold text-gray-800 mt-1 pt-1 border-t">

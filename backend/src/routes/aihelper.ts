@@ -9,22 +9,28 @@ const MODEL = 'asi1';
 
 let asiClient: OpenAI | null = null;
 
-function resolveAsiApiKey(): string | undefined {
+async function resolveAsiApiKey(): Promise<string | undefined> {
   const envKey = process.env.ASI_ONE_API_KEY?.trim();
   if (envKey) return envKey;
 
-  const settings = queryOne<{ asi_api_key?: string }>('SELECT asi_api_key FROM store_settings LIMIT 1');
+  const settings = await queryOne<{ asi_api_key?: string }>('SELECT asi_api_key FROM store_settings LIMIT 1');
   const dbKey = settings?.asi_api_key?.trim();
   return dbKey;
 }
 
-export function getAsiClient(): OpenAI {
-  const apiKey = resolveAsiApiKey();
+export async function getAsiClient(): Promise<OpenAI> {
+  const apiKey = await resolveAsiApiKey();
 
   if (!apiKey) {
-    throw new Error(
-      'Missing ASI_ONE_API_KEY. Please set ASI_ONE_API_KEY in your .env file or configure in Online Store settings.'
-    );
+    // Return a dummy client for now - will fail when actually used
+    // This allows server to start without API key configured
+    if (!asiClient) {
+      asiClient = new OpenAI({
+        apiKey: 'dummy-key',
+        baseURL: 'https://api.asi1.ai/v1',
+      });
+    }
+    return asiClient;
   }
 
   if (!asiClient) {
@@ -43,7 +49,14 @@ async function callAI(
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
   retries = 4
 ): Promise<string> {
-  const client = getAsiClient();
+  const apiKey = await resolveAsiApiKey();
+
+  if (!apiKey) {
+    console.warn('[AI] ASI:One API key not configured. AI features are disabled.');
+    return 'AI features are not configured. Please set ASI_ONE_API_KEY in your .env file or configure it in Online Store settings.';
+  }
+
+  const client = await getAsiClient();
 
   for (let i = 0; i < retries; i++) {
     try {

@@ -4,7 +4,7 @@ import { query, queryOne, execute } from '../database/db';
 const router = Router();
 
 // Get all activities
-router.get('/', (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
     try {
         const { contact_id, deal_id, type, limit = '100' } = req.query;
 
@@ -35,7 +35,7 @@ router.get('/', (req: Request, res: Response) => {
         sql += ' ORDER BY a.created_at DESC LIMIT ?';
         params.push(Number(limit));
 
-        const activities = query(sql, params);
+        const activities = await query(sql, params);
         res.json({ activities });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -43,7 +43,7 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // Create activity
-router.post('/', (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response) => {
     try {
         const { type, subject, description, contact_id, deal_id, due_date } = req.body;
 
@@ -51,13 +51,13 @@ router.post('/', (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Type and subject are required' });
         }
 
-        const result = execute(
+        const result = await execute(
             `INSERT INTO activities (type, subject, description, contact_id, deal_id, due_date)
        VALUES (?, ?, ?, ?, ?, ?)`,
             [type, subject, description, contact_id, deal_id, due_date]
         );
 
-        const activity = queryOne('SELECT * FROM activities WHERE id = ?', [result.lastInsertRowid]);
+        const activity = await queryOne('SELECT * FROM activities WHERE id = ?', [result.lastInsertRowid]);
         res.status(201).json(activity);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -65,19 +65,19 @@ router.post('/', (req: Request, res: Response) => {
 });
 
 // Update activity
-router.put('/:id', (req: Request, res: Response) => {
+router.put('/:id', async (req: Request, res: Response) => {
     try {
         const { type, subject, description, contact_id, deal_id, due_date, completed } = req.body;
 
-        execute(
+        await execute(
             `UPDATE activities SET
         type = ?, subject = ?, description = ?, contact_id = ?,
         deal_id = ?, due_date = ?, completed = ?
       WHERE id = ?`,
-            [type, subject, description, contact_id, deal_id, due_date, completed ? 1 : 0, req.params.id]
+            [type, subject, description, contact_id, deal_id, due_date, completed ? true : false, req.params.id]
         );
 
-        const activity = queryOne('SELECT * FROM activities WHERE id = ?', [req.params.id]);
+        const activity = await queryOne('SELECT * FROM activities WHERE id = ?', [req.params.id]);
         res.json(activity);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -85,9 +85,9 @@ router.put('/:id', (req: Request, res: Response) => {
 });
 
 // Delete activity
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response) => {
     try {
-        execute('DELETE FROM activities WHERE id = ?', [req.params.id]);
+        await execute('DELETE FROM activities WHERE id = ?', [req.params.id]);
         res.json({ message: 'Activity deleted successfully' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

@@ -21,7 +21,7 @@ router.post('/register', async (req: Request, res: Response) => {
         }
 
         // Check if user exists
-        const existing = queryOne('SELECT id FROM users WHERE email = ?', [email]);
+        const existing = await queryOne('SELECT id FROM users WHERE email = ?', [email]);
         if (existing) {
             return res.status(400).json({ error: 'User already exists' });
         }
@@ -30,7 +30,7 @@ router.post('/register', async (req: Request, res: Response) => {
         const passwordHash = hashPassword(password);
 
         // Create user
-        const result = execute(
+        const result = await execute(
             'INSERT INTO users (email, password_hash, full_name) VALUES (?, ?, ?)',
             [email, passwordHash, fullName]
         );
@@ -58,7 +58,7 @@ router.post('/login', async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Email and password are required' });
         }
 
-        const user = queryOne<any>('SELECT * FROM users WHERE email = ?', [email]);
+        const user = await queryOne<any>('SELECT * FROM users WHERE email = ?', [email]);
         if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }

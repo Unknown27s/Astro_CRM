@@ -30,7 +30,7 @@ function validateContactInput(data: any, isUpdate = false): { valid: boolean; er
 }
 
 // Get all contacts
-router.get('/', (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
     try {
         const { search, status, limit = '100', offset = '0' } = req.query;
 
@@ -61,8 +61,8 @@ router.get('/', (req: Request, res: Response) => {
         sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
         params.push(safeLimitNum, safeOffsetNum);
 
-        const contacts = query(sql, params);
-        const total = queryOne<{ count: number }>(countSql, countParams);
+        const contacts = await query(sql, params);
+        const total = await queryOne<{ count: number }>(countSql, countParams);
 
         res.json({ contacts, total: total?.count || 0 });
     } catch (error: any) {
@@ -71,9 +71,9 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // Get single contact
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', async (req: Request, res: Response) => {
     try {
-        const contact = queryOne('SELECT * FROM contacts WHERE id = ?', [req.params.id]);
+        const contact = await queryOne('SELECT * FROM contacts WHERE id = ?', [req.params.id]);
         if (!contact) {
             return res.status(404).json({ error: 'Contact not found' });
         }
@@ -84,7 +84,7 @@ router.get('/:id', (req: Request, res: Response) => {
 });
 
 // Create contact
-router.post('/', (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response) => {
     try {
         const {
             first_name, last_name, email, phone, company, position,
@@ -96,7 +96,7 @@ router.post('/', (req: Request, res: Response) => {
             return res.status(400).json({ error: validation.error });
         }
 
-        const result = execute(
+        const result = await execute(
             `INSERT INTO contacts (
         first_name, last_name, email, phone, company, position,
         address, city, state, country, postal_code, source, status, tags, notes
@@ -106,7 +106,7 @@ router.post('/', (req: Request, res: Response) => {
                 tags ? JSON.stringify(tags) : null, notes]
         );
 
-        const contact = queryOne('SELECT * FROM contacts WHERE id = ?', [result.lastInsertRowid]);
+        const contact = await queryOne('SELECT * FROM contacts WHERE id = ?', [result.lastInsertRowid]);
         res.status(201).json(contact);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -114,7 +114,7 @@ router.post('/', (req: Request, res: Response) => {
 });
 
 // Update contact
-router.put('/:id', (req: Request, res: Response) => {
+router.put('/:id', async (req: Request, res: Response) => {
     try {
         const {
             first_name, last_name, email, phone, company, position,
@@ -126,7 +126,7 @@ router.put('/:id', (req: Request, res: Response) => {
             return res.status(400).json({ error: validation.error });
         }
 
-        execute(
+        await execute(
             `UPDATE contacts SET
         first_name = ?, last_name = ?, email = ?, phone = ?, company = ?, position = ?,
         address = ?, city = ?, state = ?, country = ?, postal_code = ?,
@@ -137,7 +137,7 @@ router.put('/:id', (req: Request, res: Response) => {
                 tags ? JSON.stringify(tags) : null, notes, req.params.id]
         );
 
-        const contact = queryOne('SELECT * FROM contacts WHERE id = ?', [req.params.id]);
+        const contact = await queryOne('SELECT * FROM contacts WHERE id = ?', [req.params.id]);
         res.json(contact);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -145,9 +145,9 @@ router.put('/:id', (req: Request, res: Response) => {
 });
 
 // Delete contact
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response) => {
     try {
-        execute('DELETE FROM contacts WHERE id = ?', [req.params.id]);
+        await execute('DELETE FROM contacts WHERE id = ?', [req.params.id]);
         res.json({ message: 'Contact deleted successfully' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

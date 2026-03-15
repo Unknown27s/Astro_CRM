@@ -1,7 +1,7 @@
 // src/routes/ai.ts — Unified AI Feature Routes
 
 import { Router, Request, Response } from 'express';
-import { query } from '../database/db';
+import { query, parseJsonField } from '../database/db';
 import {
   generateDashboardSummary,
   explainAnalytics,
@@ -32,7 +32,7 @@ router.post('/chat', async (req: Request, res: Response) => {
 router.post('/dashboard-summary', async (req: Request, res: Response) => {
   try {
     // Pull live data from DB
-    const customerStats: any = query(
+    const customerStats: any = (await query(
       `SELECT
         COUNT(*) as total,
         COUNT(CASE WHEN status='Active' THEN 1 END) as active,
@@ -40,30 +40,30 @@ router.post('/dashboard-summary', async (req: Request, res: Response) => {
         COUNT(CASE WHEN status='Inactive' THEN 1 END) as inactive,
         SUM(total_spent) as total_revenue
        FROM customers`
-    )[0];
+    ))[0];
 
-    const recentRevenue: any = query(
-      `SELECT COALESCE(SUM(total_amount),0) as revenue FROM purchases WHERE purchase_date >= date('now','-30 days')`
-    )[0];
+    const recentRevenue: any = (await query(
+      `SELECT COALESCE(SUM(total_amount),0) as revenue FROM purchases WHERE purchase_date >= CURRENT_DATE - INTERVAL '30 days'`
+    ))[0];
 
-    const previousRevenue: any = query(
+    const previousRevenue: any = (await query(
       `SELECT COALESCE(SUM(total_amount),0) as revenue FROM purchases
-       WHERE purchase_date >= date('now','-60 days') AND purchase_date < date('now','-30 days')`
-    )[0];
+       WHERE purchase_date >= CURRENT_DATE - INTERVAL '60 days' AND purchase_date < CURRENT_DATE - INTERVAL '30 days'`
+    ))[0];
 
-    const topItems: any[] = query(
-      `SELECT items FROM purchases WHERE purchase_date >= date('now','-30 days')`
+    const topItems: any[] = await query(
+      `SELECT items FROM purchases WHERE purchase_date >= CURRENT_DATE - INTERVAL '30 days'`
     ) as any[];
 
     // Extract top product names
     const itemCounts: Record<string, number> = {};
     topItems.forEach((p: any) => {
       try {
-        JSON.parse(p.items || '[]').forEach((item: any) => {
+        parseJsonField(p.items).forEach((item: any) => {
           const name = item.name || 'Unknown';
           itemCounts[name] = (itemCounts[name] || 0) + (item.qty || 1);
         });
-      } catch {}
+      } catch { }
     });
     const topProducts = Object.entries(itemCounts)
       .sort((a, b) => b[1] - a[1])
@@ -95,7 +95,7 @@ router.post('/dashboard-summary', async (req: Request, res: Response) => {
 // ─── POST /api/ai/explain-analytics ──────────────────────────────────────────
 router.post('/explain-analytics', async (req: Request, res: Response) => {
   try {
-    const segmentRows: any[] = query(
+    const segmentRows: any[] = await query(
       `SELECT segment_name as name, customer_count as count,
               avg_value as avgValue, avg_frequency as avgFrequency
        FROM customer_segments`
@@ -109,8 +109,8 @@ router.post('/explain-analytics', async (req: Request, res: Response) => {
       segments: segmentRows.map((s) => ({
         name: s.name,
         count: Number(s.count),
-        avgValue: Number(s.avgValue || 0),
-        avgFrequency: Number(s.avgFrequency || 0),
+        avgValue: Number(s.avgvalue || 0),
+        avgFrequency: Number(s.avgfrequency || 0),
       })),
     });
 
@@ -147,9 +147,9 @@ router.post('/customer-risk', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'customerId is required' });
     }
 
-    const customerRows: any[] = query(
+    const customerRows: any[] = await query(
       `SELECT c.name, c.total_spent, c.total_purchases, c.status,
-              CAST(julianday('now') - julianday(c.last_purchase_date) AS INTEGER) as days_since,
+              EXTRACT(EPOCH FROM (NOW() - c.last_purchase_date)) / 86400 as days_since,
               CASE WHEN c.total_purchases > 0 THEN c.total_spent / c.total_purchases ELSE 0 END as avg_order
        FROM customers c WHERE c.id = ?`,
       [customerId]
@@ -179,24 +179,24 @@ router.post('/customer-risk', async (req: Request, res: Response) => {
 // ─── POST /api/ai/sales-forecast ─────────────────────────────────────────────
 router.post('/sales-forecast', async (req: Request, res: Response) => {
   try {
-    const trends: any[] = query(
-      `SELECT DATE(purchase_date) as date,
+    const trends: any[] = await query(
+      `SELECT purchase_date::date as date,
               SUM(total_amount) as revenue,
               COUNT(*) as purchase_count
        FROM purchases
-       WHERE purchase_date >= date('now','-30 days')
-       GROUP BY DATE(purchase_date)
+       WHERE purchase_date >= CURRENT_DATE - INTERVAL '30 days'
+       GROUP BY purchase_date::date
        ORDER BY date ASC`
     ) as any[];
 
-    const totalLast30: any = query(
-      `SELECT COALESCE(SUM(total_amount),0) as revenue FROM purchases WHERE purchase_date >= date('now','-30 days')`
-    )[0];
+    const totalLast30: any = (await query(
+      `SELECT COALESCE(SUM(total_amount),0) as revenue FROM purchases WHERE purchase_date >= CURRENT_DATE - INTERVAL '30 days'`
+    ))[0];
 
-    const totalPrev30: any = query(
+    const totalPrev30: any = (await query(
       `SELECT COALESCE(SUM(total_amount),0) as revenue FROM purchases
-       WHERE purchase_date >= date('now','-60 days') AND purchase_date < date('now','-30 days')`
-    )[0];
+       WHERE purchase_date >= CURRENT_DATE - INTERVAL '60 days' AND purchase_date < CURRENT_DATE - INTERVAL '30 days'`
+    ))[0];
 
     const curr = Number(totalLast30?.revenue || 0);
     const prev = Number(totalPrev30?.revenue || 0);
@@ -230,27 +230,26 @@ router.post('/report-summary', async (req: Request, res: Response) => {
     const period = month && year ? `${pad(month)}/${year}` : 'Last 30 Days';
     const dateFilter = month && year
       ? `purchase_date >= '${year}-${pad(month)}-01' AND purchase_date < '${year}-${pad(Number(month) + 1)}-01'`
-      : `purchase_date >= date('now','-30 days')`;
+      : `purchase_date >= CURRENT_DATE - INTERVAL '30 days'`;
 
-    const stats: any = query(
+    const stats: any = (await query(
       `SELECT COALESCE(SUM(total_amount),0) as revenue,
               COUNT(*) as orders,
               CASE WHEN COUNT(*)>0 THEN SUM(total_amount)/COUNT(*) ELSE 0 END as avg_order
        FROM purchases WHERE ${dateFilter}`
-    )[0];
+    ))[0];
 
-    const newCustomers: any = query(
-      `SELECT COUNT(*) as count FROM customers WHERE ${
-        month && year
-          ? `created_at >= '${year}-${pad(month)}-01' AND created_at < '${year}-${pad(Number(month) + 1)}-01'`
-          : `created_at >= date('now','-30 days')`
+    const newCustomers: any = (await query(
+      `SELECT COUNT(*) as count FROM customers WHERE ${month && year
+        ? `created_at >= '${year}-${pad(month)}-01' AND created_at < '${year}-${pad(Number(month) + 1)}-01'`
+        : `created_at >= CURRENT_DATE - INTERVAL '30 days'`
       }`
-    )[0];
+    ))[0];
 
-    const prevRevenue: any = query(
+    const prevRevenue: any = (await query(
       `SELECT COALESCE(SUM(total_amount),0) as revenue FROM purchases
-       WHERE purchase_date >= date('now','-60 days') AND purchase_date < date('now','-30 days')`
-    )[0];
+       WHERE purchase_date >= CURRENT_DATE - INTERVAL '60 days' AND purchase_date < CURRENT_DATE - INTERVAL '30 days'`
+    ))[0];
 
     const curr = Number(stats?.revenue || 0);
     const prev = Number(prevRevenue?.revenue || 0);
