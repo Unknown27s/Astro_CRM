@@ -244,4 +244,176 @@ function assignSegmentNames(clusters: any[], customerData: any[]): string[] {
     return names;
 }
 
+// ─── RFM Analysis (Recency, Frequency, Monetary) ─────────────────────────
+router.get('/rfm-analysis', async (req: Request, res: Response) => {
+    try {
+        const rfmData = await query(`
+            SELECT
+                c.id, c.name, c.phone, c.email,
+                EXTRACT(EPOCH FROM (NOW() - MAX(p.purchase_date)))::int / 86400 as recency_days,
+                COUNT(DISTINCT p.id) as frequency,
+                COALESCE(SUM(p.total_amount), 0) as monetary,
+                DATE(MAX(p.purchase_date)) as last_purchase
+            FROM customers c
+            LEFT JOIN purchases p ON c.id = p.customer_id
+            WHERE c.status IN ('Active', 'VIP')
+            GROUP BY c.id, c.name, c.phone, c.email
+            ORDER BY monetary DESC
+            LIMIT 100
+        `);
+
+        // Score each dimension 1-5
+        const scored = rfmData.map((row: any) => {
+            const recencyScore = row.recency_days < 30 ? 5 : row.recency_days < 90 ? 4 : row.recency_days < 180 ? 3 : row.recency_days < 365 ? 2 : 1;
+            const frequencyScore = row.frequency >= 10 ? 5 : row.frequency >= 5 ? 4 : row.frequency >= 3 ? 3 : row.frequency >= 2 ? 2 : 1;
+            const monetaryScore = row.monetary >= 10000 ? 5 : row.monetary >= 5000 ? 4 : row.monetary >= 2000 ? 3 : row.monetary >= 500 ? 2 : 1;
+            const rfmScore = `${recencyScore}${frequencyScore}${monetaryScore}`;
+
+            return {
+                id: row.id,
+                name: row.name,
+                phone: row.phone,
+                recency_days: row.recency_days,
+                frequency: row.frequency,
+                monetary: Number(row.monetary || 0),
+                rfm_score: rfmScore,
+                segment: rfmScore === '555' || rfmScore.startsWith('55') ? 'VIP' :
+                         rfmScore.startsWith('1') ? 'Inactive' :
+                         rfmScore.startsWith('5') ? 'Active' : 'Medium'
+            };
+        });
+
+        res.json({ rfm_analysis: scored, total_customers: rfmData.length });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ─── Churn Prediction ────────────────────────────────────────────────────
+router.get('/churn-risk', async (req: Request, res: Response) => {
+    try {
+        const churnRiskData = await query(`
+            SELECT
+                c.id, c.name, c.phone, c.email, c.status,
+                EXTRACT(EPOCH FROM (NOW() - MAX(p.purchase_date)))::int / 86400 as days_inactive,
+                COUNT(DISTINCT p.id) as total_purchases,
+                COALESCE(SUM(p.total_amount), 0) as total_spent,
+                DATE(MAX(p.purchase_date)) as last_purchase_date
+            FROM customers c
+            LEFT JOIN purchases p ON c.id = p.customer_id
+            WHERE c.status != 'Churned'
+            GROUP BY c.id, c.name, c.phone, c.email, c.status
+            HAVING EXTRACT(EPOCH FROM (NOW() - COALESCE(MAX(p.purchase_date), c.created_at)))::int / 86400 > 90
+            ORDER BY days_inactive DESC
+            LIMIT 50
+        `);
+
+        const withRisk = churnRiskData.map((row: any) => {
+            const daysInactive = row.days_inactive || 0;
+            const churnRiskScore = Math.min(100, Math.round((daysInactive / 365) * 100));
+            const riskLevel = churnRiskScore >= 80 ? 'Critical' : churnRiskScore >= 60 ? 'High' : churnRiskScore >= 40 ? 'Medium' : 'Low';
+
+            return {
+                id: row.id,
+                name: row.name,
+                phone: row.phone,
+                email: row.email,
+                days_inactive: daysInactive,
+                total_purchases: Number(row.total_purchases || 0),
+                total_spent: Number(row.total_spent || 0),
+                last_purchase: row.last_purchase_date,
+                churn_risk_score: churnRiskScore,
+                risk_level: riskLevel,
+                recommendation: riskLevel === 'Critical' ? 'Send win-back campaign' : riskLevel === 'High' ? 'Offer incentive' : 'Monitor'
+            };
+        });
+
+        res.json({ at_risk_customers: withRisk, total_at_risk: withRisk.length });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ─── Customer Lifetime Value (CLV) Prediction ────────────────────────────
+router.get('/customer-ltv', async (req: Request, res: Response) => {
+    try {
+        const clvData = await query(`
+            SELECT
+                c.id, c.name, c.phone, c.email,
+                EXTRACT(EPOCH FROM (NOW() - c.created_at))::int / 86400 as customer_age_days,
+                COUNT(DISTINCT p.id) as total_purchases,
+                COALESCE(SUM(p.total_amount), 0) as total_spent,
+                COALESCE(AVG(p.total_amount), 0) as avg_order_value,
+                EXTRACT(EPOCH FROM (MAX(p.purchase_date) - MIN(p.purchase_date)))::int / 86400 as purchase_span_days
+            FROM customers c
+            LEFT JOIN purchases p ON c.id = p.customer_id
+            GROUP BY c.id, c.name, c.phone, c.email, c.created_at
+            HAVING COUNT(DISTINCT p.id) > 0
+            ORDER BY total_spent DESC
+            LIMIT 100
+        `);
+
+        const withLTV = clvData.map((row: any) => {
+            const totalSpent = Number(row.total_spent || 0);
+            const avgOrderValue = Number(row.avg_order_value || 0);
+            const purchaseFrequency = row.total_purchases > 0 ? row.purchase_span_days > 0 ? (row.total_purchases / (row.purchase_span_days / 365)) : row.total_purchases : 0;
+
+            // Simplified CLV: (Average Order Value × Purchase Frequency × Customer Lifespan in years)
+            const estimatedLTVMonths = 36; // 3 year horizon
+            const predictedLTV = avgOrderValue * purchaseFrequency * (estimatedLTVMonths / 12);
+
+            return {
+                id: row.id,
+                name: row.name,
+                phone: row.phone,
+                email: row.email,
+                current_value: totalSpent,
+                predicted_3yr_ltv: Math.round(predictedLTV),
+                avg_order_value: Math.round(avgOrderValue),
+                purchase_frequency_annual: Number(purchaseFrequency.toFixed(2)),
+                total_purchases: Number(row.total_purchases || 0),
+                customer_age_months: Math.round(row.customer_age_days / 30),
+                value_tier: predictedLTV >= 50000 ? 'Premium' : predictedLTV >= 20000 ? 'High' : predictedLTV >= 5000 ? 'Medium' : 'Low'
+            };
+        });
+
+        res.json({ customer_ltv: withLTV, total_analyzed: withLTV.length });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ─── Product Affinity Analysis (Which products are bought together) ──────
+router.get('/product-affinity', async (req: Request, res: Response) => {
+    try {
+        const affinityData = await query(`
+            WITH purchase_items AS (
+                SELECT
+                    p.id as purchase_id,
+                    jsonb_array_elements(p.items) -> 'name' as product_name
+                FROM purchases p
+                WHERE p.items IS NOT NULL AND jsonb_array_length(p.items) > 0
+            )
+            SELECT
+                product_name::text as product,
+                COUNT(DISTINCT purchase_id) as times_purchased,
+                (SELECT string_agg(DISTINCT (jsonb_array_elements(items) ->> 'name'), ', ')
+                 FROM purchases p2
+                 WHERE p2.id IN (
+                    SELECT purchase_id FROM purchase_items WHERE product_name::text = (
+                        SELECT product_name::text FROM purchase_items LIMIT 1
+                    )
+                 )) as frequently_bought_with
+            FROM purchase_items
+            GROUP BY product_name
+            ORDER BY COUNT(DISTINCT purchase_id) DESC
+            LIMIT 20
+        `);
+
+        res.json({ product_affinity: affinityData });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 export default router;

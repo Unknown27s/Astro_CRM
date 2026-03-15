@@ -10,9 +10,14 @@ router.get('/storefront', async (req: Request, res: Response) => {
     try {
         const settingsRows = await query('SELECT * FROM store_settings LIMIT 1');
         const settings = settingsRows[0] || {};
-        const products = await query(
+        const productsRaw = await query(
             'SELECT * FROM products WHERE is_visible = true ORDER BY created_at DESC'
         );
+        // Normalize price field: use selling_price if price is null/0
+        const products = productsRaw.map((p: any) => ({
+            ...p,
+            price: p.price || p.selling_price || 0
+        }));
         res.json({ settings, products });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

@@ -96,9 +96,13 @@ router.post('/dashboard-summary', async (req: Request, res: Response) => {
 router.post('/explain-analytics', async (req: Request, res: Response) => {
   try {
     const segmentRows: any[] = await query(
-      `SELECT segment_name as name, customer_count as count,
-              avg_value as avgValue, avg_frequency as avgFrequency
-       FROM customer_segments`
+      `SELECT segment_name as name,
+              COUNT(*) as count,
+              AVG((features::jsonb->>'total_value')::float) as avgValue,
+              AVG((features::jsonb->>'purchase_count')::float) as avgFrequency
+       FROM customer_segments
+       WHERE segment_name IS NOT NULL
+       GROUP BY segment_name`
     ) as any[];
 
     if (!segmentRows.length) {
@@ -108,7 +112,7 @@ router.post('/explain-analytics', async (req: Request, res: Response) => {
     const explanation = await explainAnalytics({
       segments: segmentRows.map((s) => ({
         name: s.name,
-        count: Number(s.count),
+        count: Number(s.count || 0),
         avgValue: Number(s.avgvalue || 0),
         avgFrequency: Number(s.avgfrequency || 0),
       })),

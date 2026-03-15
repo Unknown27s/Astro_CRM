@@ -52,7 +52,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
         req.path.startsWith('/api/auth') ||
         req.path === '/api/health' ||
         req.path === '/api/shop/storefront' ||
-        req.path === '/api/shop/validate-coupon';
+        req.path === '/api/shop/validate-coupon' ||
+        req.path === '/api/shop/order';
     if (isPublicRoute || req.method === 'OPTIONS') {
         return next();
     }
