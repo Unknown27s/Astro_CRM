@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { users } from '../services/api';
 import {
     LayoutDashboard,
     Users,
@@ -15,6 +16,8 @@ import {
     X,
     ChevronDown,
     CalendarCheck,
+    Handshake,
+    ShieldCheck,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -46,6 +49,20 @@ export default function Layout({ setAuth }: LayoutProps) {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    const [userRole, setUserRole] = useState<string>('viewer');
+
+    useEffect(() => {
+        users.getMe()
+            .then(res => {
+                if (res.data?.user?.role) {
+                    setUserRole(res.data.user.role);
+                }
+            })
+            .catch(() => {
+                // If failed, assume viewer or token is invalid. App logic handles invalid token redirect.
+            });
+    }, []);
+
     const handleLogout = () => {
         localStorage.removeItem('token');
         setAuth(false);
@@ -53,18 +70,22 @@ export default function Layout({ setAuth }: LayoutProps) {
     };
 
     const navItems = [
-        { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-        { path: '/customers', icon: Users, label: 'Customers' },
-        { path: '/activities', icon: CalendarCheck, label: 'Activities' },
-        { path: '/campaigns', icon: Send, label: 'Campaigns' },
-        { path: '/insights', icon: BarChart3, label: 'Insights' },
-        { path: '/analytics', icon: Sparkles, label: 'ML Analytics' },
-        { path: '/reports', icon: FileDown, label: 'Reports' },
-        { path: '/import', icon: Upload, label: 'Import Data' },
-        { path: '/stock', icon: ShoppingBag, label: 'Stock Management' },
-        { path: '/online-store', icon: ShoppingBag, label: 'Online Store' },
-        { path: '/ai', icon: Cpu, label: 'AI Studio' },
+        { path: '/', icon: LayoutDashboard, label: 'Dashboard', access: ['admin', 'manager', 'staff', 'viewer'] },
+        { path: '/customers', icon: Users, label: 'Customers', access: ['admin', 'manager', 'staff'] },
+        { path: '/activities', icon: CalendarCheck, label: 'Activities', access: ['admin', 'manager', 'staff'] },
+        { path: '/deals', icon: Handshake, label: 'Deals Pipeline', access: ['admin', 'manager'] },
+        { path: '/campaigns', icon: Send, label: 'Campaigns', access: ['admin', 'manager'] },
+        { path: '/insights', icon: BarChart3, label: 'Insights', access: ['admin', 'manager', 'viewer'] },
+        { path: '/analytics', icon: Sparkles, label: 'ML Analytics', access: ['admin', 'manager'] },
+        { path: '/reports', icon: FileDown, label: 'Reports', access: ['admin', 'manager'] },
+        { path: '/stock', icon: ShoppingBag, label: 'Stock Management', access: ['admin', 'manager', 'staff'] },
+        { path: '/online-store', icon: ShoppingBag, label: 'Online Store', access: ['admin', 'manager', 'staff'] },
+        { path: '/import', icon: Upload, label: 'Import Data', access: ['admin'] },
+        { path: '/ai', icon: Cpu, label: 'AI Studio', access: ['admin'] },
+        { path: '/users', icon: ShieldCheck, label: 'User Roles', access: ['admin'] },
     ];
+
+    const visibleNavItems = navItems.filter(item => item.access.includes(userRole));
 
     const NavLink = ({ item }: { item: (typeof navItems)[0] }) => {
         const Icon = item.icon;
@@ -129,7 +150,7 @@ export default function Layout({ setAuth }: LayoutProps) {
 
                 {/* Navigation */}
                 <nav className={`flex-1 overflow-y-auto transition-all ${isCollapsed ? 'p-1 space-y-1' : 'p-3 space-y-2'}`}>
-                    {navItems.map((item) => (
+                    {visibleNavItems.map((item) => (
                         <NavLink key={item.path} item={item} />
                     ))}
                 </nav>

@@ -230,6 +230,56 @@ CREATE INDEX IF NOT EXISTS idx_activities_type ON activities(type);
 CREATE INDEX IF NOT EXISTS idx_activities_due_date ON activities(due_date);
 CREATE INDEX IF NOT EXISTS idx_activities_completed ON activities(completed);
 
+-- Customer Notes / Interaction Timeline
+CREATE TABLE IF NOT EXISTS customer_notes (
+    id SERIAL PRIMARY KEY,
+    customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id),
+    note_type VARCHAR(50) DEFAULT 'general',
+    content TEXT NOT NULL,
+    is_pinned BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_customer_notes_customer ON customer_notes(customer_id);
+CREATE INDEX IF NOT EXISTS idx_customer_notes_type ON customer_notes(note_type);
+CREATE INDEX IF NOT EXISTS idx_customer_notes_pinned ON customer_notes(is_pinned);
+
+-- Deals / Sales Pipeline
+CREATE TABLE IF NOT EXISTS deals (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+    value DECIMAL(12,2) DEFAULT 0,
+    currency VARCHAR(10) DEFAULT 'INR',
+    stage VARCHAR(50) DEFAULT 'Lead',
+    probability INTEGER DEFAULT 0,
+    expected_close_date DATE,
+    description TEXT,
+    lost_reason TEXT,
+    won_date TIMESTAMP,
+    lost_date TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    user_id INTEGER REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_deals_stage ON deals(stage);
+CREATE INDEX IF NOT EXISTS idx_deals_customer ON deals(customer_id);
+CREATE INDEX IF NOT EXISTS idx_deals_close_date ON deals(expected_close_date);
+
+-- Add role column to users (safe — does nothing if column already exists)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'role'
+    ) THEN
+        ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'admin';
+    END IF;
+END $$;
+
 -- Seed default store settings if empty
 INSERT INTO store_settings (id, store_name) VALUES (1, 'AstroCRM Store')
 ON CONFLICT (id) DO NOTHING;

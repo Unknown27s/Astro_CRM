@@ -16,6 +16,8 @@ import Reports from './pages/Reports';
 import StockManagement from './pages/StockManagement';
 import AIAssistant from './components/AIAssistant';
 import AIStudio from './pages/AIStudio';
+import Deals from './pages/Deals';
+import UserManagement from './pages/UserManagement';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = React.useState(
@@ -57,6 +59,8 @@ function App() {
           <Route path="analytics" element={<Analytics />} />
           <Route path="reports" element={<Reports />} />
           <Route path="ai" element={<AIStudio />} />
+          <Route path="deals" element={<Deals />} />
+          <Route path="users" element={<UserManagement />} />
         </Route>
 
         <Route path="*" element={<Navigate to={isAuthenticated ? '/' : '/login'} replace />} />

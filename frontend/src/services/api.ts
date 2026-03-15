@@ -183,6 +183,34 @@ export const activities = {
     getStats: () => api.get('/activities/stats'),
 };
 
+// Customer Notes (interaction timeline)
+export const notes = {
+    getByCustomer: (customerId: number, params?: any) => api.get(`/notes/customer/${customerId}`, { params }),
+    create: (data: any) => api.post('/notes', data),
+    update: (id: number, data: any) => api.put(`/notes/${id}`, data),
+    togglePin: (id: number) => api.patch(`/notes/${id}/pin`),
+    delete: (id: number) => api.delete(`/notes/${id}`),
+    getCounts: () => api.get('/notes/stats/counts'),
+};
+
+// Deals (sales pipeline)
+export const deals = {
+    getAll: (params?: any) => api.get('/deals', { params }),
+    getOne: (id: number) => api.get(`/deals/${id}`),
+    getPipeline: () => api.get('/deals/pipeline'),
+    create: (data: any) => api.post('/deals', data),
+    update: (id: number, data: any) => api.put(`/deals/${id}`, data),
+    updateStage: (id: number, stage: string, lostReason?: string) => api.patch(`/deals/${id}/stage`, { stage, lost_reason: lostReason }),
+    delete: (id: number) => api.delete(`/deals/${id}`),
+};
+
+// User Management (roles & permissions)
+export const users = {
+    getMe: () => api.get('/auth/me'),
+    getAll: () => api.get('/auth/users'),
+    updateRole: (id: number, role: string) => api.patch(`/auth/users/${id}/role`, { role }),
+};
+
 // Public shop (no auth needed — uses base axios without interceptor)
 const publicApi = axios.create({ baseURL: API_BASE_URL });
 export const publicShop = {

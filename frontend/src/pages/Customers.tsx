@@ -20,6 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { Spinner, EmptyState } from '../components/ui/Avatar';
+import CustomerNotes from '../components/CustomerNotes';
 
 export default function Customers() {
     const [customerList, setCustomerList] = useState<any[]>([]);
@@ -619,6 +620,10 @@ export default function Customers() {
                                                 <p className="text-center text-neutral-500 py-4 text-sm">No purchases yet</p>
                                             )}
                                         </div>
+                                    </div>
+                                    {/* Customer Notes */}
+                                    <div className="pt-6 border-t border-neutral-200">
+                                        <CustomerNotes customerId={selectedCustomer.id} />
                                     </div>
                                 </CardContent>
                             </>

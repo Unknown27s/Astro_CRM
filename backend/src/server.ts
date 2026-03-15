@@ -24,6 +24,8 @@ import aiRouter from './routes/ai';
 import inventoryRouter from './routes/inventory';
 import googleSheetsRouter from './routes/google-sheets';
 import activitiesRouter from './routes/activities';
+import notesRouter from './routes/notes';
+import dealsRouter from './routes/deals';
 import { getAsiClient } from './routes/aihelper';
 
 dotenv.config();
@@ -95,6 +97,8 @@ app.use('/api/ai', aiRouter);
 app.use('/api/inventory', inventoryRouter);
 app.use('/api/google-sheets', googleSheetsRouter);
 app.use('/api/activities', activitiesRouter);
+app.use('/api/notes', notesRouter);
+app.use('/api/deals', dealsRouter);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {
