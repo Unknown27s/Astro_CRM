@@ -214,6 +214,57 @@ export async function migrateToV3() {
             console.log('✨ Fresh installation - no data to migrate');
         }
 
+        // Step 7: Add missing columns for online store compatibility
+        console.log('🛍️  Adding online store columns to products...');
+        try {
+            const productCols = query(`PRAGMA table_info(products)`);
+            const colNames = productCols.map((col: any) => col.name);
+
+            if (!colNames.includes('price')) {
+                console.log('   → Adding price column...');
+                execute(`ALTER TABLE products ADD COLUMN price REAL`);
+            }
+            if (!colNames.includes('original_price')) {
+                execute(`ALTER TABLE products ADD COLUMN original_price REAL`);
+            }
+            if (!colNames.includes('image_url')) {
+                execute(`ALTER TABLE products ADD COLUMN image_url TEXT`);
+            }
+            if (!colNames.includes('stock_qty')) {
+                execute(`ALTER TABLE products ADD COLUMN stock_qty INTEGER DEFAULT 0`);
+            }
+            if (!colNames.includes('in_stock')) {
+                execute(`ALTER TABLE products ADD COLUMN in_stock INTEGER DEFAULT 1`);
+            }
+            if (!colNames.includes('is_visible')) {
+                execute(`ALTER TABLE products ADD COLUMN is_visible INTEGER DEFAULT 1`);
+            }
+            if (!colNames.includes('seller_id')) {
+                execute(`ALTER TABLE products ADD COLUMN seller_id INTEGER`);
+            }
+            console.log('✅ Online store columns added');
+        } catch (error: any) {
+            if (!error.message?.includes('duplicate column')) {
+                console.warn(`⚠️  Warning adding columns: ${error.message}`);
+            }
+        }
+
+        // Step 8: Add customer_type to customers table
+        console.log('👥 Adding customer type tracking...');
+        try {
+            const customerCols = query(`PRAGMA table_info(customers)`);
+            const colNames = customerCols.map((col: any) => col.name);
+
+            if (!colNames.includes('customer_type')) {
+                execute(`ALTER TABLE customers ADD COLUMN customer_type TEXT DEFAULT 'buyer'`);
+            }
+            console.log('✅ Customer type column added');
+        } catch (error: any) {
+            if (!error.message?.includes('duplicate column')) {
+                console.warn(`⚠️  Warning adding columns: ${error.message}`);
+            }
+        }
+
         console.log('✅ Migration to v3.0.0 completed successfully!');
     } catch (error) {
         console.error('❌ Migration failed:', error);

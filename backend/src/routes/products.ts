@@ -7,9 +7,14 @@ const router = Router();
 router.get('/', (req: Request, res: Response) => {
     try {
         const products = query('SELECT * FROM products ORDER BY created_at DESC');
-        res.json({ products });
+        res.json({
+            products,
+            total: products.length,
+            message: 'Products retrieved successfully'
+        });
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        console.error('Error fetching products:', error);
+        res.status(500).json({ error: error.message || 'Failed to fetch products' });
     }
 });
 
@@ -20,6 +25,7 @@ router.get('/:id', (req: Request, res: Response) => {
         if (!product) return res.status(404).json({ error: 'Product not found' });
         res.json({ product });
     } catch (error: any) {
+        console.error('Error fetching product:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -28,33 +34,59 @@ router.get('/:id', (req: Request, res: Response) => {
 router.post('/', (req: Request, res: Response) => {
     try {
         const {
-            name, description, price, original_price,
-            image_url, category, stock_qty, in_stock, is_visible
+            name, description, price, original_price, selling_price,
+            image_url, category, stock_qty, current_stock, in_stock, is_visible,
+            sku, barcode, cost_price, min_stock_level, max_stock_level, supplier
         } = req.body;
 
         if (!name?.trim()) return res.status(400).json({ error: 'Product name is required' });
-        if (price === undefined || price === null) return res.status(400).json({ error: 'Price is required' });
 
-        const result = execute(
-            `INSERT INTO products (name, description, price, original_price, image_url, category, stock_qty, in_stock, is_visible)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                name.trim(),
-                description || '',
-                Number(price),
-                original_price ? Number(original_price) : null,
-                image_url || '',
-                category || '',
-                Number(stock_qty) || 0,
-                in_stock !== false ? 1 : 0,
-                is_visible !== false ? 1 : 0
-            ]
-        );
+        // Accept either 'price' or 'selling_price'
+        const finalPrice = price || selling_price;
+        if (finalPrice === undefined || finalPrice === null) {
+            return res.status(400).json({ error: 'Price or selling_price is required' });
+        }
 
-        const product = query('SELECT * FROM products WHERE id = ?', [result.lastInsertRowid])[0];
-        res.json({ product });
+        try {
+            const result = execute(
+                `INSERT INTO products (
+                    name, description, price, original_price, image_url, category,
+                    stock_qty, in_stock, is_visible, sku, barcode, cost_price,
+                    selling_price, current_stock, min_stock_level, max_stock_level, supplier
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    name.trim(),
+                    description || '',
+                    Number(price) || null,
+                    original_price ? Number(original_price) : null,
+                    image_url || '',
+                    category || '',
+                    Number(stock_qty) || Number(current_stock) || 0,
+                    in_stock !== false ? 1 : 0,
+                    is_visible !== false ? 1 : 0,
+                    sku || '',
+                    barcode || '',
+                    cost_price ? Number(cost_price) : null,
+                    Number(finalPrice),
+                    Number(current_stock) || Number(stock_qty) || 0,
+                    min_stock_level ? Number(min_stock_level) : 10,
+                    max_stock_level ? Number(max_stock_level) : 100,
+                    supplier || ''
+                ]
+            );
+
+            const product = query('SELECT * FROM products WHERE id = ?', [result.lastInsertRowid])[0];
+            res.status(201).json({ product, message: 'Product created successfully' });
+        } catch (dbError: any) {
+            console.error('Database error creating product:', dbError);
+            return res.status(500).json({
+                error: `Failed to create product: ${dbError.message}`,
+                details: dbError.message
+            });
+        }
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        console.error('Product creation error:', error);
+        res.status(500).json({ error: error.message || 'Internal server error' });
     }
 });
 
