@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { FileDown, Calendar, Brain, Sparkles } from 'lucide-react';
+import { FileDown, Calendar, Brain, Sparkles, Download, Loader2 } from 'lucide-react';
 import { reports, aiService } from '../services/api';
+import { Button } from '../components/ui/Button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
+import { Input } from '../components/ui/Input';
+import { Label } from '../components/ui/Label';
 
 export default function Reports() {
     const [reportType, setReportType] = useState('sales');
@@ -17,6 +21,11 @@ export default function Reports() {
     const [aiYear, setAiYear] = useState<number>(new Date().getFullYear());
 
     const handleGenerate = async () => {
+        if (!startDate || !endDate) {
+            toast.error('Please select both start and end dates');
+            return;
+        }
+
         setGenerating(true);
         try {
             let response;
@@ -30,17 +39,14 @@ export default function Reports() {
                 response = await reports.generateSegments(data);
             }
 
-            // Download file
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute(
-                'download',
-                `${reportType}-report.${format === 'pdf' ? 'pdf' : 'xlsx'}`
-            );
+            link.setAttribute('download', `${reportType}-report.${format === 'pdf' ? 'pdf' : 'xlsx'}`);
             document.body.appendChild(link);
             link.click();
             link.remove();
+            toast.success('Report downloaded');
         } catch (error) {
             console.error('Error generating report:', error);
             toast.error('Error generating report');
@@ -63,7 +69,7 @@ export default function Reports() {
             }
         } catch (error) {
             console.error('Error generating AI report:', error);
-            toast.error('AI report failed. Check your ASI_ONE_API_KEY.');
+            toast.error('AI report failed. Check your API key.');
         } finally {
             setAiGenerating(false);
         }
@@ -79,11 +85,7 @@ export default function Reports() {
             const monthText = String(aiMonth).padStart(2, '0');
 
             link.href = url;
-            link.setAttribute(
-                'download',
-                `monthly-business-report-${aiYear}-${monthText}.${monthlyFormat === 'pdf' ? 'pdf' : 'xlsx'}`
-            );
-
+            link.setAttribute('download', `monthly-business-report-${aiYear}-${monthText}.${monthlyFormat === 'pdf' ? 'pdf' : 'xlsx'}`);
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -97,228 +99,248 @@ export default function Reports() {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-fade-in">
+            {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold text-gray-800">Report Generation</h1>
-                <p className="text-gray-600 mt-1">
-                    Generate comprehensive reports in PDF or Excel format
-                </p>
+                <h1 className="text-3xl font-bold text-neutral-900">Report Generation</h1>
+                <p className="text-neutral-500 mt-1">Generate comprehensive reports in PDF or Excel format</p>
             </div>
 
-            <div className="bg-white rounded-xl shadow-md p-6 max-w-2xl">
-                <div className="space-y-4">
-                    {/* Report Type */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Report Type
-                        </label>
-                        <select
-                            value={reportType}
-                            onChange={(e) => setReportType(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        >
-                            <option value="sales">Sales Report</option>
-                            <option value="customers">Customer Report</option>
-                            <option value="segments">Segment Analysis</option>
-                        </select>
-                    </div>
+            {/* Basic Report Generator */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Generate Report</CardTitle>
+                    <CardDescription>Select report type and format</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div>
+                            <Label htmlFor="reportType">Report Type</Label>
+                            <select
+                                id="reportType"
+                                value={reportType}
+                                onChange={(e) => setReportType(e.target.value)}
+                                className="w-full mt-2 px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                            >
+                                <option value="sales">Sales Report</option>
+                                <option value="customers">Customer Report</option>
+                                <option value="segments">Segment Analysis</option>
+                            </select>
+                        </div>
 
-                    {/* Format */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Format
-                        </label>
-                        <div className="flex gap-4">
-                            <label className="flex items-center">
-                                <input
-                                    type="radio"
-                                    value="excel"
-                                    checked={format === 'excel'}
-                                    onChange={(e) => setFormat(e.target.value)}
-                                    className="mr-2"
-                                />
-                                Excel (.xlsx)
-                            </label>
-                            <label className="flex items-center">
-                                <input
-                                    type="radio"
-                                    value="pdf"
-                                    checked={format === 'pdf'}
-                                    onChange={(e) => setFormat(e.target.value)}
-                                    className="mr-2"
-                                />
-                                PDF
-                            </label>
+                        <div>
+                            <Label>Format</Label>
+                            <div className="flex gap-4 mt-2">
+                                <label className="flex items-center">
+                                    <input
+                                        type="radio"
+                                        value="excel"
+                                        checked={format === 'excel'}
+                                        onChange={(e) => setFormat(e.target.value)}
+                                        className="mr-2"
+                                    />
+                                    <span className="text-sm">Excel</span>
+                                </label>
+                                <label className="flex items-center">
+                                    <input
+                                        type="radio"
+                                        value="pdf"
+                                        checked={format === 'pdf'}
+                                        onChange={(e) => setFormat(e.target.value)}
+                                        className="mr-2"
+                                    />
+                                    <span className="text-sm">PDF</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Date Range */}
                     {reportType === 'sales' && (
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Start Date
-                                </label>
-                                <div className="relative">
-                                    <Calendar
-                                        className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                                        size={18}
-                                    />
-                                    <input
+                                <Label htmlFor="startDate">Start Date</Label>
+                                <div className="relative mt-2">
+                                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" size={18} />
+                                    <Input
+                                        id="startDate"
                                         type="date"
                                         value={startDate}
                                         onChange={(e) => setStartDate(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                        className="pl-10"
                                     />
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    End Date
-                                </label>
-                                <div className="relative">
-                                    <Calendar
-                                        className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                                        size={18}
-                                    />
-                                    <input
+                                <Label htmlFor="endDate">End Date</Label>
+                                <div className="relative mt-2">
+                                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" size={18} />
+                                    <Input
+                                        id="endDate"
                                         type="date"
                                         value={endDate}
                                         onChange={(e) => setEndDate(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                        className="pl-10"
                                     />
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Generate Button */}
-                    <button
+                    <Button
                         onClick={handleGenerate}
                         disabled={generating}
-                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50"
+                        size="lg"
+                        className="gap-2 w-full sm:w-auto"
                     >
-                        <FileDown size={20} />
-                        {generating ? 'Generating...' : 'Generate Report'}
-                    </button>
-                </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md p-6 max-w-4xl space-y-4">
-                <div>
-                    <h2 className="text-xl font-bold text-gray-800">AI Monthly Report</h2>
-                    <p className="text-sm text-gray-600 mt-1">
-                        One AI call generates an executive summary from monthly CRM data.
-                    </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Month</label>
-                        <input
-                            type="number"
-                            min={1}
-                            max={12}
-                            value={aiMonth}
-                            onChange={(e) => setAiMonth(Number(e.target.value) || 1)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
-                        <input
-                            type="number"
-                            min={2000}
-                            max={2100}
-                            value={aiYear}
-                            onChange={(e) => setAiYear(Number(e.target.value) || new Date().getFullYear())}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        />
-                    </div>
-                    <button
-                        onClick={handleGenerateAiReport}
-                        disabled={aiGenerating}
-                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-2.5 rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50"
-                    >
-                        {aiGenerating ? (
-                            <><Sparkles size={16} className="animate-spin" /> Analyzing with ASI:One...</>
+                        {generating ? (
+                            <>
+                                <Loader2 size={20} className="animate-spin" />
+                                Generating...
+                            </>
                         ) : (
-                            <><Brain size={16} /> Generate AI Business Summary</>
+                            <>
+                                <FileDown size={20} />
+                                Generate Report
+                            </>
                         )}
-                    </button>
-                </div>
+                    </Button>
+                </CardContent>
+            </Card>
 
-                <div className="flex flex-col md:flex-row md:items-center gap-3">
-                    <div className="flex items-center gap-4">
-                        <label className="flex items-center text-sm text-gray-700">
-                            <input
-                                type="radio"
-                                name="monthly-format"
-                                checked={monthlyFormat === 'pdf'}
-                                onChange={() => setMonthlyFormat('pdf')}
-                                className="mr-2"
-                            />
-                            PDF
-                        </label>
-                        <label className="flex items-center text-sm text-gray-700">
-                            <input
-                                type="radio"
-                                name="monthly-format"
-                                checked={monthlyFormat === 'excel'}
-                                onChange={() => setMonthlyFormat('excel')}
-                                className="mr-2"
-                            />
-                            Excel
-                        </label>
-                    </div>
-                    <button
-                        onClick={handleDownloadMonthlyBusinessReport}
-                        disabled={monthlyDownloading}
-                        className="md:ml-auto px-4 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-all disabled:opacity-50"
-                    >
-                        {monthlyDownloading ? 'Downloading...' : 'Download Monthly Business Report'}
-                    </button>
-                </div>
-
-                {aiSummary && (
-                    <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 p-5">
-                        <div className="flex items-center gap-2 mb-3">
-                            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                                <Brain size={16} className="text-white" />
-                            </div>
-                            <div>
-                                <h3 className="text-sm font-bold text-gray-800">AI Business Summary</h3>
-                                <p className="text-[10px] text-gray-500">Powered by ASI:One</p>
-                            </div>
+            {/* AI Reports */}
+            <Card className="bg-gradient-to-r from-primary-50 to-primary-100 border-primary-200">
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <Brain className="text-primary-600" size={24} />
+                        <div>
+                            <CardTitle>AI Monthly Report</CardTitle>
+                            <CardDescription>AI-powered executive summary</CardDescription>
                         </div>
-                        <p className="text-sm text-gray-700 leading-relaxed">{aiSummary}</p>
                     </div>
-                )}
-            </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                        <div>
+                            <Label htmlFor="aiMonth">Month</Label>
+                            <Input
+                                id="aiMonth"
+                                type="number"
+                                min={1}
+                                max={12}
+                                value={aiMonth}
+                                onChange={(e) => setAiMonth(Number(e.target.value) || 1)}
+                                className="mt-2"
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="aiYear">Year</Label>
+                            <Input
+                                id="aiYear"
+                                type="number"
+                                min={2000}
+                                max={2100}
+                                value={aiYear}
+                                onChange={(e) =>
+                                    setAiYear(Number(e.target.value) || new Date().getFullYear())
+                                }
+                                className="mt-2"
+                            />
+                        </div>
+                        <Button
+                            onClick={handleGenerateAiReport}
+                            disabled={aiGenerating}
+                            variant="default"
+                            className="gap-2"
+                        >
+                            {aiGenerating ? (
+                                <>
+                                    <Sparkles size={18} className="animate-spin" />
+                                    Analyzing...
+                                </>
+                            ) : (
+                                <>
+                                    <Brain size={18} />
+                                    Generate
+                                </>
+                            )}
+                        </Button>
+                    </div>
 
-            {/* Report Templates */}
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                        <div className="flex gap-4">
+                            <label className="flex items-center text-sm">
+                                <input
+                                    type="radio"
+                                    name="monthly-format"
+                                    checked={monthlyFormat === 'pdf'}
+                                    onChange={() => setMonthlyFormat('pdf')}
+                                    className="mr-2"
+                                />
+                                PDF
+                            </label>
+                            <label className="flex items-center text-sm">
+                                <input
+                                    type="radio"
+                                    name="monthly-format"
+                                    checked={monthlyFormat === 'excel'}
+                                    onChange={() => setMonthlyFormat('excel')}
+                                    className="mr-2"
+                                />
+                                Excel
+                            </label>
+                        </div>
+                        <Button
+                            onClick={handleDownloadMonthlyBusinessReport}
+                            disabled={monthlyDownloading}
+                            variant="secondary"
+                            size="sm"
+                            className="gap-2 sm:ml-auto"
+                        >
+                            {monthlyDownloading ? (
+                                <>
+                                    <Loader2 size={16} className="animate-spin" />
+                                    Downloading...
+                                </>
+                            ) : (
+                                <>
+                                    <Download size={16} />
+                                    Download
+                                </>
+                            )}
+                        </Button>
+                    </div>
+
+                    {aiSummary && (
+                        <div className="bg-white rounded-lg p-4 border border-primary-300 mt-4">
+                            <p className="text-sm text-neutral-700 leading-relaxed">{aiSummary}</p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Report Templates Info */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white rounded-xl shadow-md p-6">
-                    <h3 className="font-bold text-gray-800 mb-2">Sales Report</h3>
-                    <p className="text-sm text-gray-600">
-                        Comprehensive sales data with revenue breakdown, trends, and regional
-                        analysis
-                    </p>
-                </div>
-                <div className="bg-white rounded-xl shadow-md p-6">
-                    <h3 className="font-bold text-gray-800 mb-2">Customer Report</h3>
-                    <p className="text-sm text-gray-600">
-                        Customer database export with contact details, segments, and purchase
-                        history
-                    </p>
-                </div>
-                <div className="bg-white rounded-xl shadow-md p-6">
-                    <h3 className="font-bold text-gray-800 mb-2">Segment Analysis</h3>
-                    <p className="text-sm text-gray-600">
-                        ML-powered customer segmentation insights with RFM metrics and cluster
-                        characteristics
-                    </p>
-                </div>
+                {[
+                    {
+                        title: 'Sales Report',
+                        description: 'Comprehensive sales data with revenue breakdown, trends, and regional analysis',
+                    },
+                    {
+                        title: 'Customer Report',
+                        description: 'Customer database export with contact details, segments, and purchase history',
+                    },
+                    {
+                        title: 'Segment Analysis',
+                        description: 'ML-powered customer segmentation insights with RFM metrics and characteristics',
+                    },
+                ].map((template, idx) => (
+                    <Card key={idx}>
+                        <CardContent className="p-6">
+                            <h3 className="font-semibold text-neutral-900 mb-2">{template.title}</h3>
+                            <p className="text-sm text-neutral-600">{template.description}</p>
+                        </CardContent>
+                    </Card>
+                ))}
             </div>
         </div>
     );

@@ -5,9 +5,15 @@ import {
     LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { TrendingUp, Users, ShoppingCart, DollarSign, Calendar, Download, FileText, X } from 'lucide-react';
+import { TrendingUp, Users, ShoppingCart, DollarSign, Download, FileText, Loader2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Badge } from '../components/ui/Badge';
+import { Modal } from '../components/ui/Modal';
+import { Label, Select } from '../components/ui/Label';
+import { Spinner } from '../components/ui/Avatar';
 
 export default function Insights() {
     const [period, setPeriod] = useState('30days');
@@ -46,6 +52,7 @@ export default function Insights() {
             setLocationRevenue(location.data);
         } catch (error) {
             console.error('Error fetching insights:', error);
+            toast.error('Failed to load insights');
         } finally {
             setLoading(false);
         }
@@ -78,7 +85,6 @@ export default function Insights() {
         setReportStep('generating');
 
         try {
-            // Wait a tick for any final render
             await new Promise((r) => setTimeout(r, 300));
 
             const element = reportRef.current;
@@ -115,6 +121,7 @@ export default function Insights() {
             setShowReportModal(false);
             setReportStep('select');
             setMonthlyData(null);
+            toast.success('PDF downloaded successfully');
         } catch (error) {
             console.error('Error generating PDF:', error);
             toast.error('Error generating PDF. Please try again.');
@@ -134,416 +141,498 @@ export default function Insights() {
         yearOptions.push(y);
     }
 
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-96">
+                <div className="text-center">
+                    <Spinner size="lg" className="mx-auto mb-4" />
+                    <p className="text-neutral-500">Loading insights...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
+        <div className="space-y-6 animate-fade-in">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-800">Business Insights</h1>
-                    <p className="text-gray-600 mt-1">Visual analytics and trends</p>
+                    <h1 className="text-3xl font-bold text-neutral-900">Business Insights</h1>
+                    <p className="text-neutral-500 mt-1">Visual analytics and trends</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    {/* Monthly Report Button */}
-                    <button
-                        onClick={() => { setShowReportModal(true); setReportStep('select'); }}
-                        className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all shadow-md"
+                    <Button
+                        onClick={() => {
+                            setShowReportModal(true);
+                            setReportStep('select');
+                        }}
+                        size="md"
                     >
-                        <Download size={18} />
+                        <Download size={16} className="mr-2" />
                         Monthly Report
-                    </button>
-                    <Calendar className="text-gray-400" size={20} />
-                    <select
+                    </Button>
+                    <Select
                         value={period}
                         onChange={(e) => setPeriod(e.target.value)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        className="h-10"
                     >
                         <option value="7days">Last 7 Days</option>
                         <option value="30days">Last 30 Days</option>
                         <option value="90days">Last 3 Months</option>
                         <option value="180days">Last 6 Months</option>
                         <option value="365days">Last Year</option>
-                    </select>
+                    </Select>
                 </div>
             </div>
 
             {/* Monthly Report Modal */}
-            {showReportModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
-                        {/* Modal Header */}
-                        <div className="flex justify-between items-center p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center">
-                                    <FileText size={20} className="text-white" />
+            <Modal
+                isOpen={showReportModal}
+                onClose={closeModal}
+                size="xl"
+            >
+                <div className="space-y-6">
+                    {/* Modal Header */}
+                    <div className="flex items-center gap-3 pb-4 border-b border-neutral-200">
+                        <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-primary-700 rounded-lg flex items-center justify-center">
+                            <FileText size={20} className="text-white" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-neutral-900">Monthly Business Report</h2>
+                            <p className="text-sm text-neutral-500">Select period to generate a comprehensive report</p>
+                        </div>
+                    </div>
+
+                    {/* Step 1: Select Month/Year */}
+                    {reportStep === 'select' && (
+                        <div className="max-w-md mx-auto space-y-6">
+                            <div className="text-center mb-6">
+                                <p className="text-neutral-600">Choose the month and year for your report</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <Label className="mb-2 block">Month</Label>
+                                    <Select
+                                        value={reportMonth}
+                                        onChange={(e) => setReportMonth(Number(e.target.value))}
+                                    >
+                                        {MONTH_NAMES.map((name, idx) => (
+                                            <option key={idx} value={idx + 1}>{name}</option>
+                                        ))}
+                                    </Select>
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-bold text-gray-800">Monthly Business Report</h2>
-                                    <p className="text-sm text-gray-500">Select period to generate a comprehensive report</p>
-                                </div>
-                            </div>
-                            <button onClick={closeModal} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                                <X size={20} className="text-gray-600" />
-                            </button>
-                        </div>
-
-                        {/* Step 1: Select Month/Year */}
-                        {reportStep === 'select' && (
-                            <div className="p-8">
-                                <div className="max-w-md mx-auto space-y-6">
-                                    <div className="text-center mb-6">
-                                        <p className="text-gray-600">Choose the month and year for your report</p>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Month</label>
-                                            <select
-                                                value={reportMonth}
-                                                onChange={(e) => setReportMonth(Number(e.target.value))}
-                                                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-800"
-                                            >
-                                                {MONTH_NAMES.map((name, idx) => (
-                                                    <option key={idx} value={idx + 1}>{name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
-                                            <select
-                                                value={reportYear}
-                                                onChange={(e) => setReportYear(Number(e.target.value))}
-                                                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-800"
-                                            >
-                                                {yearOptions.map((y) => (
-                                                    <option key={y} value={y}>{y}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
-                                        <h4 className="font-semibold text-indigo-800 mb-2">Report includes:</h4>
-                                        <ul className="text-sm text-indigo-700 space-y-1">
-                                            <li>• Revenue & purchase KPI summary</li>
-                                            <li>• Daily revenue trend chart</li>
-                                            <li>• Customer distribution breakdown</li>
-                                            <li>• Purchases by day of week chart</li>
-                                            <li>• Revenue by location chart</li>
-                                            <li>• Top customers ranking table</li>
-                                            <li>• Top selling items & payment methods</li>
-                                        </ul>
-                                    </div>
-
-                                    <button
-                                        onClick={handleFetchMonthlyData}
-                                        disabled={generatingReport}
-                                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50"
+                                    <Label className="mb-2 block">Year</Label>
+                                    <Select
+                                        value={reportYear}
+                                        onChange={(e) => setReportYear(Number(e.target.value))}
                                     >
-                                        {generatingReport ? (
-                                            <>
-                                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                                Loading data...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <FileText size={18} />
-                                                Preview Report
-                                            </>
-                                        )}
-                                    </button>
+                                        {yearOptions.map((y) => (
+                                            <option key={y} value={y}>{y}</option>
+                                        ))}
+                                    </Select>
                                 </div>
                             </div>
-                        )}
 
-                        {/* Step 2: Preview & Download */}
-                        {(reportStep === 'preview' || reportStep === 'generating') && monthlyData && (
-                            <div className="p-6">
-                                {/* Download action bar */}
-                                <div className="flex items-center justify-between mb-6 p-4 bg-green-50 border border-green-200 rounded-xl">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                                            <FileText size={16} className="text-white" />
+                            <Card className="border-primary-200 bg-primary-50">
+                                <CardContent className="p-4">
+                                    <h4 className="font-semibold text-primary-900 mb-2">Report includes:</h4>
+                                    <ul className="text-sm text-primary-800 space-y-1">
+                                        <li>• Revenue & purchase KPI summary</li>
+                                        <li>• Daily revenue trend chart</li>
+                                        <li>• Customer distribution breakdown</li>
+                                        <li>• Purchases by day of week chart</li>
+                                        <li>• Revenue by location chart</li>
+                                        <li>• Top customers ranking table</li>
+                                        <li>• Top selling items & payment methods</li>
+                                    </ul>
+                                </CardContent>
+                            </Card>
+
+                            <Button
+                                onClick={handleFetchMonthlyData}
+                                disabled={generatingReport}
+                                fullWidth
+                                size="md"
+                            >
+                                {generatingReport ? (
+                                    <>
+                                        <Loader2 size={16} className="animate-spin mr-2" />
+                                        Loading data...
+                                    </>
+                                ) : (
+                                    <>
+                                        <FileText size={16} className="mr-2" />
+                                        Preview Report
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    )}
+
+                    {/* Step 2: Preview & Download */}
+                    {(reportStep === 'preview' || reportStep === 'generating') && monthlyData && (
+                        <div className="space-y-6">
+                            {/* Download action bar */}
+                            <Card className="border-success-200 bg-success-50">
+                                <CardContent className="p-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 bg-success-500 rounded-full flex items-center justify-center">
+                                                <FileText size={16} className="text-white" />
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-success-900">
+                                                    Report ready for {MONTH_NAMES[reportMonth - 1]} {reportYear}
+                                                </p>
+                                                <p className="text-sm text-success-700">
+                                                    Review the preview below, then download as PDF
+                                                </p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="font-semibold text-green-800">Report ready for {MONTH_NAMES[reportMonth - 1]} {reportYear}</p>
-                                            <p className="text-sm text-green-600">Review the preview below, then download as PDF</p>
+                                        <div className="flex gap-3">
+                                            <Button
+                                                onClick={() => setReportStep('select')}
+                                                variant="secondary"
+                                                size="sm"
+                                            >
+                                                Change Period
+                                            </Button>
+                                            <Button
+                                                onClick={handleDownloadPDF}
+                                                disabled={reportStep === 'generating'}
+                                                size="sm"
+                                            >
+                                                {reportStep === 'generating' ? (
+                                                    <>
+                                                        <Loader2 size={14} className="animate-spin mr-2" />
+                                                        Generating...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Download size={14} className="mr-2" />
+                                                        Download PDF
+                                                    </>
+                                                )}
+                                            </Button>
                                         </div>
                                     </div>
-                                    <div className="flex gap-3">
-                                        <button
-                                            onClick={() => setReportStep('select')}
-                                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-                                        >
-                                            Change Period
-                                        </button>
-                                        <button
-                                            onClick={handleDownloadPDF}
-                                            disabled={reportStep === 'generating'}
-                                            className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-5 py-2 rounded-lg font-semibold hover:from-green-700 hover:to-emerald-700 transition-all disabled:opacity-50"
-                                        >
-                                            {reportStep === 'generating' ? (
-                                                <>
-                                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                                    Generating PDF...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Download size={16} />
-                                                    Download PDF
-                                                </>
-                                            )}
-                                        </button>
+                                </CardContent>
+                            </Card>
+
+                            {/* Report Preview (this is what gets captured) */}
+                            <div className="border border-neutral-200 rounded-xl overflow-hidden max-h-[60vh] overflow-y-auto">
+                                <ReportPreview
+                                    reportRef={reportRef}
+                                    data={monthlyData}
+                                    monthName={MONTH_NAMES[reportMonth - 1]}
+                                    year={reportYear}
+                                    COLORS={COLORS}
+                                    formatCurrency={formatCurrency}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </Modal>
+
+            {/* Summary Cards */}
+            {revenueTrends?.summary && customerStats?.overview && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Card>
+                        <CardContent className="p-6">
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <p className="text-sm text-neutral-500 font-medium mb-2">Total Revenue</p>
+                                    <p className="text-3xl font-bold text-neutral-900">
+                                        ₹{(revenueTrends.summary.total_revenue || 0).toFixed(0)}
+                                    </p>
+                                    <div className={`text-sm font-semibold mt-2 ${revenueTrends.summary.growth_percentage >= 0 ? 'text-success-600' : 'text-danger-600'}`}>
+                                        {revenueTrends.summary.growth_percentage >= 0 ? '+' : ''}
+                                        {revenueTrends.summary.growth_percentage}% vs prev
                                     </div>
                                 </div>
-
-                                {/* Report Preview (this is what gets captured) */}
-                                <div className="border border-gray-200 rounded-xl overflow-hidden">
-                                    <ReportPreview
-                                        reportRef={reportRef}
-                                        data={monthlyData}
-                                        monthName={MONTH_NAMES[reportMonth - 1]}
-                                        year={reportYear}
-                                        COLORS={COLORS}
-                                        formatCurrency={formatCurrency}
-                                    />
+                                <div className="p-3 rounded-lg bg-success-50">
+                                    <DollarSign size={24} className="text-success-600" />
                                 </div>
                             </div>
-                        )}
-                    </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardContent className="p-6">
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <p className="text-sm text-neutral-500 font-medium mb-2">Total Customers</p>
+                                    <p className="text-3xl font-bold text-neutral-900">
+                                        {customerStats.overview.total_customers || 0}
+                                    </p>
+                                    <p className="text-sm text-neutral-500 mt-2">
+                                        {customerStats.overview.active_customers || 0} Active
+                                    </p>
+                                </div>
+                                <div className="p-3 rounded-lg bg-primary-50">
+                                    <Users size={24} className="text-primary-600" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardContent className="p-6">
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <p className="text-sm text-neutral-500 font-medium mb-2">Total Purchases</p>
+                                    <p className="text-3xl font-bold text-neutral-900">
+                                        {revenueTrends.summary.total_purchases || 0}
+                                    </p>
+                                </div>
+                                <div className="p-3 rounded-lg bg-accent-50">
+                                    <ShoppingCart size={24} className="text-accent-600" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardContent className="p-6">
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <p className="text-sm text-neutral-500 font-medium mb-2">Avg Transaction</p>
+                                    <p className="text-3xl font-bold text-neutral-900">
+                                        ₹{(revenueTrends.summary.avg_transaction || 0).toFixed(0)}
+                                    </p>
+                                </div>
+                                <div className="p-3 rounded-lg bg-warning-50">
+                                    <TrendingUp size={24} className="text-warning-600" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
             )}
 
-            {loading ? (
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-gray-500">Loading insights...</div>
-                </div>
-            ) : (
-                <>
-                    {/* Summary Cards */}
-                    {revenueTrends?.summary && customerStats?.overview && (
-                        <div className="grid grid-cols-4 gap-6">
-                            <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg p-6 text-white">
-                                <div className="flex items-center justify-between mb-2">
-                                    <DollarSign size={32} />
-                                    <span className={`text-sm px-2 py-1 rounded-full ${
-                                        revenueTrends.summary.growth_percentage >= 0
-                                            ? 'bg-white bg-opacity-20'
-                                            : 'bg-red-500 bg-opacity-30'
-                                    }`}>
-                                        {revenueTrends.summary.growth_percentage >= 0 ? '+' : ''}
-                                        {revenueTrends.summary.growth_percentage}%
-                                    </span>
-                                </div>
-                                <p className="text-sm opacity-90">Total Revenue</p>
-                                <p className="text-3xl font-bold">
-                                    ₹{revenueTrends.summary.total_revenue?.toFixed(0) || 0}
-                                </p>
-                            </div>
+            {/* Revenue Trends Chart */}
+            {revenueTrends?.trends && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Revenue Trends</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={revenueTrends.trends} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                <XAxis dataKey="date" stroke="#9ca3af" style={{ fontSize: '12px' }} />
+                                <YAxis tickFormatter={formatCurrency} stroke="#9ca3af" style={{ fontSize: '12px' }} />
+                                <Tooltip
+                                    formatter={(value: any) => formatCurrency(value)}
+                                    contentStyle={{
+                                        backgroundColor: '#fff',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '8px',
+                                    }}
+                                />
+                                <Legend />
+                                <Line
+                                    type="monotone"
+                                    dataKey="revenue"
+                                    stroke="#10B981"
+                                    strokeWidth={3}
+                                    dot={{ fill: '#10B981', r: 4 }}
+                                    name="Revenue"
+                                />
+                                <Line
+                                    type="monotone"
+                                    dataKey="purchase_count"
+                                    stroke="#4F46E5"
+                                    strokeWidth={2}
+                                    dot={{ fill: '#4F46E5', r: 3 }}
+                                    name="Purchases"
+                                />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+            )}
 
-                            <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg p-6 text-white">
-                                <Users size={32} className="mb-2" />
-                                <p className="text-sm opacity-90">Total Customers</p>
-                                <p className="text-3xl font-bold">
-                                    {customerStats.overview.total_customers || 0}
-                                </p>
-                                <p className="text-sm mt-1">
-                                    {customerStats.overview.active_customers || 0} Active
-                                </p>
-                            </div>
-
-                            <div className="bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-lg p-6 text-white">
-                                <ShoppingCart size={32} className="mb-2" />
-                                <p className="text-sm opacity-90">Total Purchases</p>
-                                <p className="text-3xl font-bold">
-                                    {revenueTrends.summary.total_purchases || 0}
-                                </p>
-                            </div>
-
-                            <div className="bg-gradient-to-br from-orange-500 to-red-600 rounded-xl shadow-lg p-6 text-white">
-                                <TrendingUp size={32} className="mb-2" />
-                                <p className="text-sm opacity-90">Avg Transaction</p>
-                                <p className="text-3xl font-bold">
-                                    ₹{revenueTrends.summary.avg_transaction?.toFixed(0) || 0}
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Revenue Trends Chart */}
-                    {revenueTrends?.trends && (
-                        <div className="bg-white rounded-xl shadow-md p-6">
-                            <h2 className="text-xl font-bold text-gray-800 mb-4">Revenue Trends</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Customer Distribution */}
+                {customerStats?.overview && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Customer Distribution</CardTitle>
+                        </CardHeader>
+                        <CardContent>
                             <ResponsiveContainer width="100%" height={300}>
-                                <LineChart data={revenueTrends.trends}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="date" />
-                                    <YAxis tickFormatter={formatCurrency} />
-                                    <Tooltip formatter={(value: any) => formatCurrency(value)} />
-                                    <Legend />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="revenue"
-                                        stroke="#10B981"
-                                        strokeWidth={3}
-                                        dot={{ fill: '#10B981', r: 4 }}
-                                        name="Revenue"
-                                    />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="purchase_count"
-                                        stroke="#4F46E5"
-                                        strokeWidth={2}
-                                        dot={{ fill: '#4F46E5', r: 3 }}
-                                        name="Purchases"
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-6">
-                        {/* Customer Distribution */}
-                        {customerStats?.overview && (
-                            <div className="bg-white rounded-xl shadow-md p-6">
-                                <h2 className="text-xl font-bold text-gray-800 mb-4">Customer Distribution</h2>
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <PieChart>
-                                        <Pie
-                                            data={[
-                                                { name: 'Active', value: customerStats.overview.active_customers },
-                                                { name: 'VIP', value: customerStats.overview.vip_customers },
-                                                { name: 'Inactive', value: customerStats.overview.inactive_customers }
-                                            ]}
-                                            cx="50%"
-                                            cy="50%"
-                                            labelLine={false}
-                                            label={({ name, percent }: any) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                                            outerRadius={100}
-                                            fill="#8884d8"
-                                            dataKey="value"
-                                        >
-                                            {[0, 1, 2].map((index) => (
-                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
-                        )}
-
-                        {/* Purchase by Day of Week */}
-                        {purchasePatterns?.by_day_of_week && (
-                            <div className="bg-white rounded-xl shadow-md p-6">
-                                <h2 className="text-xl font-bold text-gray-800 mb-4">Purchases by Day</h2>
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <BarChart data={purchasePatterns.by_day_of_week}>
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="day_name" />
-                                        <YAxis />
-                                        <Tooltip />
-                                        <Legend />
-                                        <Bar dataKey="purchase_count" fill="#4F46E5" name="Purchases" />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-6">
-                        {/* Top Items */}
-                        {purchasePatterns?.top_items && purchasePatterns.top_items.length > 0 && (
-                            <div className="bg-white rounded-xl shadow-md p-6">
-                                <h2 className="text-xl font-bold text-gray-800 mb-4">Top Selling Items</h2>
-                                <div className="space-y-3">
-                                    {purchasePatterns.top_items.slice(0, 8).map((item: any, idx: number) => (
-                                        <div key={idx} className="flex justify-between items-center">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm">
-                                                    {idx + 1}
-                                                </div>
-                                                <span className="font-medium text-gray-800">{item.name}</span>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="font-semibold text-gray-800">{item.count} sold</p>
-                                                <p className="text-sm text-gray-500">₹{item.revenue.toFixed(0)}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Revenue by Location */}
-                        {locationRevenue?.by_location && locationRevenue.by_location.length > 0 && (
-                            <div className="bg-white rounded-xl shadow-md p-6">
-                                <h2 className="text-xl font-bold text-gray-800 mb-4">Revenue by Location</h2>
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <BarChart data={locationRevenue.by_location.slice(0, 10)} layout="vertical">
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis type="number" tickFormatter={formatCurrency} />
-                                        <YAxis type="category" dataKey="location" width={100} />
-                                        <Tooltip formatter={(value: any) => formatCurrency(value)} />
-                                        <Bar dataKey="revenue" fill="#10B981" name="Revenue" />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Top Customers */}
-                    {customerStats?.top_customers && customerStats.top_customers.length > 0 && (
-                        <div className="bg-white rounded-xl shadow-md p-6">
-                            <h2 className="text-xl font-bold text-gray-800 mb-4">Top Customers</h2>
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead className="bg-gray-50 border-b">
-                                        <tr>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Spent</th>
-                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Purchases</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y">
-                                        {customerStats.top_customers.map((customer: any, idx: number) => (
-                                            <tr key={customer.id} className="hover:bg-gray-50">
-                                                <td className="px-4 py-3">
-                                                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm">
-                                                        {idx + 1}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 font-medium text-gray-800">{customer.name}</td>
-                                                <td className="px-4 py-3 text-gray-600">{customer.phone || '-'}</td>
-                                                <td className="px-4 py-3 text-gray-600">{customer.location || '-'}</td>
-                                                <td className="px-4 py-3 text-right font-bold text-green-600">
-                                                    ₹{customer.total_spent?.toFixed(2) || '0'}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-gray-600">{customer.total_purchases || 0}</td>
-                                            </tr>
+                                <PieChart>
+                                    <Pie
+                                        data={[
+                                            { name: 'Active', value: customerStats.overview.active_customers },
+                                            { name: 'VIP', value: customerStats.overview.vip_customers },
+                                            { name: 'Inactive', value: customerStats.overview.inactive_customers }
+                                        ]}
+                                        cx="50%"
+                                        cy="50%"
+                                        labelLine={false}
+                                        label={({ name, percent }: any) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                                        outerRadius={100}
+                                        fill="#8884d8"
+                                        dataKey="value"
+                                    >
+                                        {[0, 1, 2].map((index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
+                                    </Pie>
+                                    <Tooltip />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                )}
 
-                    {/* Payment Methods */}
-                    {purchasePatterns?.by_payment_method && purchasePatterns.by_payment_method.length > 0 && (
-                        <div className="bg-white rounded-xl shadow-md p-6">
-                            <h2 className="text-xl font-bold text-gray-800 mb-4">Payment Method Distribution</h2>
-                            <div className="grid grid-cols-4 gap-4">
-                                {purchasePatterns.by_payment_method.map((method: any) => (
-                                    <div key={method.payment_method} className="bg-gray-50 rounded-lg p-4 text-center">
-                                        <p className="text-2xl font-bold text-indigo-600">{method.count}</p>
-                                        <p className="text-sm text-gray-600 mt-1">{method.payment_method}</p>
-                                        <p className="text-xs text-gray-500 mt-1">₹{method.revenue.toFixed(0)}</p>
+                {/* Purchase by Day of Week */}
+                {purchasePatterns?.by_day_of_week && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Purchases by Day</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={purchasePatterns.by_day_of_week} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                    <XAxis dataKey="day_name" stroke="#9ca3af" style={{ fontSize: '12px' }} />
+                                    <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} />
+                                    <Tooltip
+                                        contentStyle={{
+                                            backgroundColor: '#fff',
+                                            border: '1px solid #e5e7eb',
+                                            borderRadius: '8px',
+                                        }}
+                                    />
+                                    <Legend />
+                                    <Bar dataKey="purchase_count" fill="#4F46E5" name="Purchases" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Top Items */}
+                {purchasePatterns?.top_items && purchasePatterns.top_items.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Top Selling Items</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-3">
+                                {purchasePatterns.top_items.slice(0, 8).map((item: any, idx: number) => (
+                                    <div key={idx} className="flex justify-between items-center p-3 bg-neutral-50 rounded-lg">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold text-sm">
+                                                {idx + 1}
+                                            </div>
+                                            <span className="font-medium text-neutral-900">{item.name}</span>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-semibold text-neutral-900">{item.count} sold</p>
+                                            <p className="text-sm text-neutral-500">₹{item.revenue.toFixed(0)}</p>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Revenue by Location */}
+                {locationRevenue?.by_location && locationRevenue.by_location.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Revenue by Location</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={locationRevenue.by_location.slice(0, 10)} layout="vertical" margin={{ top: 5, right: 30, left: 100, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                    <XAxis type="number" tickFormatter={formatCurrency} stroke="#9ca3af" style={{ fontSize: '12px' }} />
+                                    <YAxis type="category" dataKey="location" width={90} stroke="#9ca3af" style={{ fontSize: '12px' }} />
+                                    <Tooltip
+                                        formatter={(value: any) => formatCurrency(value)}
+                                        contentStyle={{
+                                            backgroundColor: '#fff',
+                                            border: '1px solid #e5e7eb',
+                                            borderRadius: '8px',
+                                        }}
+                                    />
+                                    <Bar dataKey="revenue" fill="#10B981" name="Revenue" radius={[0, 4, 4, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
+
+            {/* Top Customers */}
+            {customerStats?.top_customers && customerStats.top_customers.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Top Customers</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-neutral-200">
+                                        <th className="px-4 py-3 text-left font-semibold text-neutral-600">Rank</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-neutral-600">Name</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-neutral-600">Phone</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-neutral-600">Location</th>
+                                        <th className="px-4 py-3 text-right font-semibold text-neutral-600">Total Spent</th>
+                                        <th className="px-4 py-3 text-right font-semibold text-neutral-600">Purchases</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {customerStats.top_customers.map((customer: any, idx: number) => (
+                                        <tr key={customer.id} className="border-b border-neutral-100 hover:bg-neutral-50">
+                                            <td className="px-4 py-3">
+                                                <Badge variant="default">{idx + 1}</Badge>
+                                            </td>
+                                            <td className="px-4 py-3 font-medium text-neutral-900">{customer.name}</td>
+                                            <td className="px-4 py-3 text-neutral-600">{customer.phone || '-'}</td>
+                                            <td className="px-4 py-3 text-neutral-600">{customer.location || '-'}</td>
+                                            <td className="px-4 py-3 text-right font-bold text-success-600">
+                                                ₹{customer.total_spent?.toFixed(2) || '0'}
+                                            </td>
+                                            <td className="px-4 py-3 text-right text-neutral-600">{customer.total_purchases || 0}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
-                    )}
-                </>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Payment Methods */}
+            {purchasePatterns?.by_payment_method && purchasePatterns.by_payment_method.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Payment Method Distribution</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                            {purchasePatterns.by_payment_method.map((method: any) => (
+                                <div key={method.payment_method} className="bg-neutral-50 rounded-lg p-4 text-center">
+                                    <p className="text-2xl font-bold text-primary-600">{method.count}</p>
+                                    <p className="text-sm text-neutral-600 mt-1">{method.payment_method}</p>
+                                    <p className="text-xs text-neutral-500 mt-1">₹{method.revenue.toFixed(0)}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
             )}
         </div>
     );
@@ -574,7 +663,7 @@ function ReportPreview({ reportRef, data, monthName, year, COLORS, formatCurrenc
         >
             {/* Cover Header */}
             <div style={{
-                background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)',
+                background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)',
                 padding: '40px 48px',
                 color: 'white'
             }}>
@@ -601,10 +690,10 @@ function ReportPreview({ reportRef, data, monthName, year, COLORS, formatCurrenc
                 {/* KPI Row in header */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginTop: '32px' }}>
                     {[
-                        { label: 'Total Revenue', value: `₹${(s.total_revenue || 0).toFixed(0)}`, sub: `${s.growth_percentage >= 0 ? '+' : ''}${s.growth_percentage ?? 0}% vs prev month`, color: '#34D399' },
-                        { label: 'Total Purchases', value: s.total_purchases || 0, sub: 'transactions', color: '#60A5FA' },
-                        { label: 'Avg Transaction', value: `₹${(s.avg_transaction || 0).toFixed(0)}`, sub: 'per purchase', color: '#FBBF24' },
-                        { label: 'New Customers', value: data.new_customers || 0, sub: 'joined this month', color: '#F87171' },
+                        { label: 'Total Revenue', value: `₹${(s.total_revenue || 0).toFixed(0)}`, sub: `${s.growth_percentage >= 0 ? '+' : ''}${s.growth_percentage ?? 0}% vs prev month`, color: '#10B981' },
+                        { label: 'Total Purchases', value: s.total_purchases || 0, sub: 'transactions', color: '#3b82f6' },
+                        { label: 'Avg Transaction', value: `₹${(s.avg_transaction || 0).toFixed(0)}`, sub: 'per purchase', color: '#f59e0b' },
+                        { label: 'New Customers', value: data.new_customers || 0, sub: 'joined this month', color: '#ef4444' },
                     ].map((kpi, i) => (
                         <div key={i} style={{
                             background: 'rgba(255,255,255,0.12)',
@@ -628,7 +717,7 @@ function ReportPreview({ reportRef, data, monthName, year, COLORS, formatCurrenc
                 {/* Section: Daily Revenue Trend */}
                 <div style={{ background: 'white', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                        <div style={{ width: '4px', height: '20px', background: '#4F46E5', borderRadius: '2px' }} />
+                        <div style={{ width: '4px', height: '20px', background: '#0ea5e9', borderRadius: '2px' }} />
                         <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#1F2937', margin: 0 }}>
                             Daily Revenue Trend
                         </h2>
@@ -642,7 +731,7 @@ function ReportPreview({ reportRef, data, monthName, year, COLORS, formatCurrenc
                                 <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
                                 <Legend wrapperStyle={{ fontSize: '12px' }} />
                                 <Line type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={2.5} dot={{ r: 3 }} name="Revenue" />
-                                <Line type="monotone" dataKey="purchase_count" stroke="#4F46E5" strokeWidth={2} dot={{ r: 2.5 }} name="Purchases" />
+                                <Line type="monotone" dataKey="purchase_count" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 2.5 }} name="Purchases" />
                             </LineChart>
                         </ResponsiveContainer>
                     ) : (
@@ -690,7 +779,7 @@ function ReportPreview({ reportRef, data, monthName, year, COLORS, formatCurrenc
                     {/* Purchases by Day of Week */}
                     <div style={{ background: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                            <div style={{ width: '4px', height: '20px', background: '#F59E0B', borderRadius: '2px' }} />
+                            <div style={{ width: '4px', height: '20px', background: '#f59e0b', borderRadius: '2px' }} />
                             <h2 style={{ fontSize: '15px', fontWeight: '700', color: '#1F2937', margin: 0 }}>Purchases by Day</h2>
                         </div>
                         {data.by_day_of_week && data.by_day_of_week.length > 0 ? (
@@ -700,7 +789,7 @@ function ReportPreview({ reportRef, data, monthName, year, COLORS, formatCurrenc
                                     <XAxis dataKey="day_name" tick={{ fontSize: 11 }} />
                                     <YAxis tick={{ fontSize: 11 }} />
                                     <Tooltip />
-                                    <Bar dataKey="purchase_count" fill="#4F46E5" name="Purchases" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="purchase_count" fill="#0ea5e9" name="Purchases" radius={[4, 4, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (
@@ -715,7 +804,7 @@ function ReportPreview({ reportRef, data, monthName, year, COLORS, formatCurrenc
                 {data.by_location && data.by_location.length > 0 && (
                     <div style={{ background: 'white', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                            <div style={{ width: '4px', height: '20px', background: '#EF4444', borderRadius: '2px' }} />
+                            <div style={{ width: '4px', height: '20px', background: '#ef4444', borderRadius: '2px' }} />
                             <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#1F2937', margin: 0 }}>Revenue by Location</h2>
                         </div>
                         <ResponsiveContainer width="100%" height={Math.max(180, data.by_location.length * 40)}>
@@ -765,7 +854,7 @@ function ReportPreview({ reportRef, data, monthName, year, COLORS, formatCurrenc
                 {data.top_customers && data.top_customers.length > 0 && (
                     <div style={{ background: 'white', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                            <div style={{ width: '4px', height: '20px', background: '#4F46E5', borderRadius: '2px' }} />
+                            <div style={{ width: '4px', height: '20px', background: '#0ea5e9', borderRadius: '2px' }} />
                             <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#1F2937', margin: 0 }}>Top Customers This Month</h2>
                         </div>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
@@ -784,8 +873,8 @@ function ReportPreview({ reportRef, data, monthName, year, COLORS, formatCurrenc
                                         <td style={{ padding: '10px 12px' }}>
                                             <span style={{
                                                 display: 'inline-flex', width: '24px', height: '24px',
-                                                background: i < 3 ? '#EEF2FF' : '#F9FAFB',
-                                                color: i < 3 ? '#4F46E5' : '#6B7280',
+                                                background: i < 3 ? '#DBEAFE' : '#F9FAFB',
+                                                color: i < 3 ? '#0ea5e9' : '#6B7280',
                                                 borderRadius: '50%', alignItems: 'center', justifyContent: 'center',
                                                 fontSize: '11px', fontWeight: 'bold'
                                             }}>{i + 1}</span>
@@ -808,7 +897,7 @@ function ReportPreview({ reportRef, data, monthName, year, COLORS, formatCurrenc
                 {data.top_items && data.top_items.length > 0 && (
                     <div style={{ background: 'white', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                            <div style={{ width: '4px', height: '20px', background: '#F59E0B', borderRadius: '2px' }} />
+                            <div style={{ width: '4px', height: '20px', background: '#f59e0b', borderRadius: '2px' }} />
                             <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#1F2937', margin: 0 }}>Top Selling Items</h2>
                         </div>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
@@ -834,7 +923,7 @@ function ReportPreview({ reportRef, data, monthName, year, COLORS, formatCurrenc
                                             }}>{i + 1}</span>
                                         </td>
                                         <td style={{ padding: '10px 12px', fontWeight: '600', color: '#1F2937' }}>{item.name}</td>
-                                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#4F46E5', fontWeight: '600' }}>{item.count}</td>
+                                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#0ea5e9', fontWeight: '600' }}>{item.count}</td>
                                         <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '700', color: '#059669' }}>
                                             ₹{(item.revenue || 0).toFixed(0)}
                                         </td>
