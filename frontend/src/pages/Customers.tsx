@@ -522,30 +522,56 @@ export default function Customers() {
                                     <div>
                                         <h3 className="text-sm font-semibold text-neutral-900 mb-3 flex items-center gap-2">
                                             <TrendingUp size={16} />
-                                            Purchase History
+                                            Purchase History & Breakdown
                                         </h3>
-                                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                                        <div className="space-y-3 max-h-96 overflow-y-auto">
                                             {customerPurchases.length > 0 ? (
-                                                customerPurchases.map((purchase: any) => (
-                                                    <div key={purchase.id} className="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
-                                                        <div className="flex justify-between items-start gap-2">
-                                                            <div>
-                                                                <p className="text-xs text-neutral-500">{purchase.purchase_date}</p>
-                                                                <p className="font-bold text-success-600">₹{purchase.total_amount.toFixed(2)}</p>
+                                                customerPurchases.map((purchase: any) => {
+                                                    const items = JSON.parse(purchase.items || '[]');
+                                                    return (
+                                                        <div key={purchase.id} className="p-3 bg-gradient-to-br from-neutral-50 to-neutral-100 rounded-lg border border-neutral-200 hover:border-primary-300 transition-all">
+                                                            {/* Purchase Header */}
+                                                            <div className="flex justify-between items-start gap-2 mb-2">
+                                                                <div>
+                                                                    <p className="text-xs text-neutral-500">{purchase.purchase_date}</p>
+                                                                    <p className="font-bold text-success-600 text-sm">Total: ₹{purchase.total_amount.toFixed(2)}</p>
+                                                                </div>
+                                                                <Badge variant="secondary" className="text-xs">
+                                                                    {purchase.payment_method || 'Cash'}
+                                                                </Badge>
                                                             </div>
-                                                            <Badge variant="secondary" className="text-xs">
-                                                                {purchase.payment_method || 'Cash'}
-                                                            </Badge>
+
+                                                            {/* Itemized Breakdown */}
+                                                            {items.length > 0 && (
+                                                                <div className="mt-2 pt-2 border-t border-neutral-300">
+                                                                    <div className="space-y-1 text-xs">
+                                                                        {items.map((item: any, idx: number) => {
+                                                                            const lineTotal = item.qty * item.price;
+                                                                            return (
+                                                                                <div key={idx} className="flex justify-between items-center gap-2 px-1">
+                                                                                    <span className="text-neutral-700 font-medium flex-1">
+                                                                                        {item.name} × {item.qty}
+                                                                                    </span>
+                                                                                    <span className="text-neutral-600">
+                                                                                        ₹{item.price.toFixed(0)}
+                                                                                    </span>
+                                                                                    <span className="text-neutral-900 font-semibold min-w-[60px] text-right">
+                                                                                        ₹{lineTotal.toFixed(2)}
+                                                                                    </span>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                    {purchase.notes && (
+                                                                        <p className="text-xs text-neutral-600 mt-2 italic">
+                                                                            Note: {purchase.notes}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                        {JSON.parse(purchase.items || '[]').length > 0 && (
-                                                            <p className="text-xs text-neutral-600 mt-2 truncate">
-                                                                {JSON.parse(purchase.items || '[]')
-                                                                    .map((item: any) => `${item.name} (${item.qty})`)
-                                                                    .join(', ')}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                ))
+                                                    );
+                                                })
                                             ) : (
                                                 <p className="text-center text-neutral-500 py-4 text-sm">No purchases yet</p>
                                             )}

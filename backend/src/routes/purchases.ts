@@ -151,29 +151,55 @@ router.put('/:id', (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Purchase not found' });
         }
 
+        // Validate items if provided
+        if (items && Array.isArray(items)) {
+            for (const item of items) {
+                if (!item.name || item.qty === undefined || item.price === undefined) {
+                    return res.status(400).json({
+                        error: 'Each item must have name, qty, and price'
+                    });
+                }
+            }
+        }
+
         const itemsJson = items ? JSON.stringify(items) : (purchase as any).items;
 
-        execute(
-            `UPDATE purchases 
-             SET items = ?,
-                 total_amount = COALESCE(?, total_amount),
-                 payment_method = COALESCE(?, payment_method),
-                 purchase_date = COALESCE(?, purchase_date),
-                 notes = COALESCE(?, notes)
-             WHERE id = ?`,
-            [itemsJson, total_amount, payment_method, purchase_date, notes, req.params.id]
-        );
+        try {
+            execute(
+                `UPDATE purchases
+                 SET items = ?,
+                     total_amount = COALESCE(?, total_amount),
+                     payment_method = COALESCE(?, payment_method),
+                     purchase_date = COALESCE(?, purchase_date),
+                     notes = COALESCE(?, notes)
+                 WHERE id = ?`,
+                [itemsJson, total_amount, payment_method || null, purchase_date, notes || null, req.params.id]
+            );
 
-        // Update customer aggregates
-        updateCustomerAggregates((purchase as any).customer_id);
+            // Update customer aggregates - wrap in try-catch to prevent cascading failures
+            try {
+                updateCustomerAggregates((purchase as any).customer_id);
+            } catch (aggregateError: any) {
+                console.warn('Warning updating aggregates:', aggregateError.message);
+                // Don't fail the update if aggregates fail
+            }
 
-        const updated = queryOne('SELECT * FROM purchases WHERE id = ?', [req.params.id]);
-        res.json({
-            ...updated,
-            items: JSON.parse((updated as any).items || '[]')
-        });
+            const updated = queryOne('SELECT * FROM purchases WHERE id = ?', [req.params.id]);
+            if (!updated) {
+                return res.status(500).json({ error: 'Failed to retrieve updated purchase' });
+            }
+
+            res.json({
+                ...updated,
+                items: JSON.parse((updated as any).items || '[]')
+            });
+        } catch (dbError: any) {
+            console.error('Database error updating purchase:', dbError);
+            return res.status(500).json({ error: 'Failed to update purchase: ' + dbError.message });
+        }
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        console.error('Purchase update error:', error);
+        res.status(500).json({ error: error.message || 'Internal server error' });
     }
 });
 

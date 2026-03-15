@@ -174,7 +174,7 @@ export default function Import() {
             csv = 'name,phone,email,location\nRajesh Kumar,9876543210,rajesh@example.com,Mumbai\nPriya Singh,9876543211,priya@example.com,Delhi\nAhmed Khan,9876543212,ahmed@example.com,Bangalore';
             filename = 'customers_sample.csv';
         } else if (type === 'products') {
-            csv = 'name,sku,barcode,category,selling_price,current_stock,min_stock_level,max_stock_level\nFormal Shirt,SKU001,1234567890,Clothing,599,50,10,100\nCasual Pants,SKU002,1234567891,Clothing,799,30,5,80\nSneakers,SKU003,1234567892,Footwear,2499,20,5,50';
+            csv = 'name,sku,barcode,category,selling_price,cost_price,current_stock,min_stock_level,max_stock_level,supplier\nFormal Shirt,SKU001,8901234000001,Clothing,599,350,50,10,100,Supplier A\nCasual Pants,SKU002,8901234000002,Clothing,799,450,30,5,80,Supplier B\nSneakers,SKU003,8901234000003,Footwear,2499,1200,20,5,50,Supplier C';
             filename = 'products_sample.csv';
         } else if (type === 'stock') {
             csv = 'barcode,product_name,quantity_change,reason\n1234567890,Formal Shirt,10,stock_in\n1234567891,Casual Pants,-2,sale\n1234567892,Sneakers,5,stock_in';
@@ -228,7 +228,7 @@ export default function Import() {
                     }`}
                 >
                     <Package size={18} className="inline mr-2" />
-                    Stock Import
+                    Product Import
                 </button>
                 <button
                     onClick={() => {
@@ -589,22 +589,23 @@ export default function Import() {
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Package size={24} />
-                                Import Stock Updates
+                                Import Products & Update Stock
                             </CardTitle>
                             <CardDescription>
-                                Upload stock adjustments using barcode. When products are barcode-scanned during sales, stock automatically updates.
+                                Upload products (create new or update existing) and manage stock levels. Existing products are matched by SKU or Barcode.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            <div className="p-4 bg-success-50 border border-success-200 rounded-lg">
-                                <p className="text-sm text-success-900">
-                                    <strong>📦 Stock Auto-Deduction:</strong>
+                            <div className="p-4 bg-primary-50 border border-primary-200 rounded-lg">
+                                <p className="text-sm text-primary-900">
+                                    <strong>📦 How Product Import Works:</strong>
                                 </p>
-                                <ul className="text-sm text-success-800 mt-2 space-y-1 ml-4 list-disc">
-                                    <li>When customer buys from online store → stock decreases automatically</li>
-                                    <li>When barcode is scanned in Stock Management → stock updates in real-time</li>
-                                    <li>Import bulk stock adjustments from Excel/CSV</li>
-                                    <li>Use barcode or product name to identify items</li>
+                                <ul className="text-sm text-primary-800 mt-2 space-y-1 ml-4 list-disc">
+                                    <li><strong>Match by SKU or Barcode:</strong> If product exists, stock quantity is updated</li>
+                                    <li><strong>Create New:</strong> If product doesn't exist, it's created with initial stock</li>
+                                    <li><strong>Auto-Reflects:</strong> Changes automatically sync to online store and inventory</li>
+                                    <li><strong>Bulk Updates:</strong> Update 100s of products at once from Excel/CSV</li>
+                                    <li><strong>Columns needed:</strong> name, sku, barcode, category, current_stock, selling_price</li>
                                 </ul>
                             </div>
 
