@@ -76,7 +76,7 @@ router.get('/', async (req: Request, res: Response) => {
     }
 });
 
-// Get single customer with purchase history
+// Get single customer with purchase history and deals
 router.get('/:id', async (req: Request, res: Response) => {
     try {
         const customer = await queryOne('SELECT * FROM customers WHERE id = ?', [req.params.id]);
@@ -90,7 +90,24 @@ router.get('/:id', async (req: Request, res: Response) => {
             [req.params.id]
         );
 
-        res.json({ ...customer, purchases });
+        // Fetch deals linked to this customer
+        const customerDeals = await query(
+            `SELECT id, title, value, stage, probability, expected_close_date, won_date, lost_date, created_at
+             FROM deals WHERE customer_id = ? ORDER BY created_at DESC`,
+            [req.params.id]
+        );
+
+        // Compute deal summary
+        const dealSummary = {
+            total_deals: customerDeals.length,
+            active_deals: customerDeals.filter((d: any) => !['Closed Won', 'Closed Lost'].includes(d.stage)).length,
+            won_deals: customerDeals.filter((d: any) => d.stage === 'Closed Won').length,
+            lost_deals: customerDeals.filter((d: any) => d.stage === 'Closed Lost').length,
+            won_value: customerDeals.filter((d: any) => d.stage === 'Closed Won').reduce((s: number, d: any) => s + Number(d.value || 0), 0),
+            pipeline_value: customerDeals.filter((d: any) => !['Closed Won', 'Closed Lost'].includes(d.stage)).reduce((s: number, d: any) => s + Number(d.value || 0), 0),
+        };
+
+        res.json({ ...customer, purchases, deals: customerDeals, dealSummary });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

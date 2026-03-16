@@ -27,6 +27,46 @@ function validateDealInput(data: any): { valid: boolean; error?: string } {
     return { valid: true };
 }
 
+/**
+ * Update customer stats when a deal transitions to/from "Closed Won".
+ * - Entering "Closed Won": add deal value to customer total_spent, increment total_purchases
+ * - Leaving "Closed Won": subtract deal value from customer total_spent, decrement total_purchases
+ */
+async function syncCustomerOnStageChange(
+    customerId: number | null,
+    oldStage: string,
+    newStage: string,
+    dealValue: number
+) {
+    if (!customerId || oldStage === newStage) return;
+
+    const wasWon = oldStage === 'Closed Won';
+    const isNowWon = newStage === 'Closed Won';
+
+    if (isNowWon && !wasWon) {
+        // Deal just won → add value to customer
+        await execute(
+            `UPDATE customers SET
+                total_spent = COALESCE(total_spent, 0) + ?,
+                total_purchases = COALESCE(total_purchases, 0) + 1,
+                last_purchase_date = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [dealValue, customerId]
+        );
+    } else if (wasWon && !isNowWon) {
+        // Deal was won but moved away → subtract value from customer
+        await execute(
+            `UPDATE customers SET
+                total_spent = GREATEST(COALESCE(total_spent, 0) - ?, 0),
+                total_purchases = GREATEST(COALESCE(total_purchases, 0) - 1, 0),
+                updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [dealValue, customerId]
+        );
+    }
+}
+
 // Get all deals (with optional stage filter)
 router.get('/', async (req: Request, res: Response) => {
     try {
@@ -193,6 +233,10 @@ router.put('/:id', async (req: Request, res: Response) => {
             lostDate = new Date().toISOString();
         }
 
+        const finalCustomerId = customer_id !== undefined ? (customer_id || null) : (existing as any).customer_id;
+        const finalStage = stage || (existing as any).stage;
+        const finalValue = value !== undefined ? Number(value) : Number((existing as any).value || 0);
+
         await execute(
             `UPDATE deals SET
                 title = COALESCE(?, title),
@@ -208,7 +252,7 @@ router.put('/:id', async (req: Request, res: Response) => {
              WHERE id = ?`,
             [
                 title,
-                customer_id !== undefined ? (customer_id || null) : (existing as any).customer_id,
+                finalCustomerId,
                 value,
                 stage,
                 probability,
@@ -218,6 +262,14 @@ router.put('/:id', async (req: Request, res: Response) => {
                 lostDate,
                 req.params.id
             ]
+        );
+
+        // Sync customer total_spent when deal goes to/from Closed Won
+        await syncCustomerOnStageChange(
+            finalCustomerId,
+            (existing as any).stage,
+            finalStage,
+            finalValue
         );
 
         const updated = await queryOne(
@@ -260,6 +312,14 @@ router.patch('/:id/stage', async (req: Request, res: Response) => {
         await execute(
             `UPDATE deals SET stage = ?, won_date = ?, lost_date = ?, lost_reason = COALESCE(?, lost_reason), updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
             [stage, wonDate, lostDate, lost_reason || null, req.params.id]
+        );
+
+        // Sync customer total_spent when deal stage changes
+        await syncCustomerOnStageChange(
+            (existing as any).customer_id,
+            (existing as any).stage,
+            stage,
+            Number((existing as any).value || 0)
         );
 
         const updated = await queryOne(

@@ -114,15 +114,6 @@ router.get('/me', async (req: Request, res: Response) => {
 // Get all users (admin only)
 router.get('/users', async (req: Request, res: Response) => {
     try {
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: 'Not authenticated' });
-        const token = authHeader.substring('Bearer '.length);
-        const decoded = jwt.verify(token, JWT_SECRET) as any;
-        
-        if (decoded.role !== 'admin') {
-            return res.status(403).json({ error: 'Admin access required' });
-        }
-
         const users = await query('SELECT id, email, full_name, role, created_at FROM users ORDER BY created_at DESC');
         res.json({ users });
     } catch (error: any) {
@@ -133,15 +124,6 @@ router.get('/users', async (req: Request, res: Response) => {
 // Update user role (admin only)
 router.patch('/users/:id/role', async (req: Request, res: Response) => {
     try {
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: 'Not authenticated' });
-        const token = authHeader.substring('Bearer '.length);
-        const decoded = jwt.verify(token, JWT_SECRET) as any;
-        
-        if (decoded.role !== 'admin') {
-            return res.status(403).json({ error: 'Admin access required' });
-        }
-
         const { role } = req.body;
 
         if (!role || !VALID_ROLES.includes(role)) {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { customers, purchases } from '../services/api';
+import { customers, purchases, notes } from '../services/api';
 import toast from 'react-hot-toast';
 import {
     Users,
@@ -12,6 +12,12 @@ import {
     TrendingUp,
     Edit2,
     Trash2,
+    Handshake,
+    Trophy,
+    XCircle,
+    MessageSquare,
+    Pin,
+    Send,
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -20,12 +26,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { Spinner, EmptyState } from '../components/ui/Avatar';
-import CustomerNotes from '../components/CustomerNotes';
 
 export default function Customers() {
     const [customerList, setCustomerList] = useState<any[]>([]);
     const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
     const [customerPurchases, setCustomerPurchases] = useState<any[]>([]);
+    const [customerDeals, setCustomerDeals] = useState<any[]>([]);
+    const [dealSummary, setDealSummary] = useState<any>({});
+    const [customerNotes, setCustomerNotes] = useState<any[]>([]);
+    const [newNoteText, setNewNoteText] = useState('');
+    const [newNoteType, setNewNoteType] = useState('general');
+    const [notesLoading, setNotesLoading] = useState(false);
     const [showAddCustomer, setShowAddCustomer] = useState(false);
     const [showEditCustomer, setShowEditCustomer] = useState(false);
     const [showAddPurchase, setShowAddPurchase] = useState(false);
@@ -99,10 +110,51 @@ export default function Customers() {
         try {
             const response = await customers.getOne(customer.id);
             setCustomerPurchases(response.data.purchases || []);
+            setCustomerDeals(response.data.deals || []);
+            setDealSummary(response.data.dealSummary || {});
         } catch (error) {
             console.error('Error fetching customer details:', error);
             toast.error('Failed to load customer details');
         }
+        // Fetch notes separately
+        fetchCustomerNotes(customer.id);
+    };
+
+    const fetchCustomerNotes = async (customerId: number) => {
+        setNotesLoading(true);
+        try {
+            const res = await notes.getByCustomer(customerId);
+            setCustomerNotes(res.data.notes || []);
+        } catch { /* ignore */ }
+        finally { setNotesLoading(false); }
+    };
+
+    const handleAddNote = async () => {
+        if (!newNoteText.trim() || !selectedCustomer) return;
+        try {
+            await notes.create({ customer_id: selectedCustomer.id, note_type: newNoteType, content: newNoteText });
+            setNewNoteText('');
+            setNewNoteType('general');
+            toast.success('Note added');
+            fetchCustomerNotes(selectedCustomer.id);
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || 'Failed to add note');
+        }
+    };
+
+    const handleTogglePin = async (noteId: number) => {
+        try {
+            await notes.togglePin(noteId);
+            if (selectedCustomer) fetchCustomerNotes(selectedCustomer.id);
+        } catch { toast.error('Failed to toggle pin'); }
+    };
+
+    const handleDeleteNote = async (noteId: number) => {
+        try {
+            await notes.delete(noteId);
+            toast.success('Note deleted');
+            if (selectedCustomer) fetchCustomerNotes(selectedCustomer.id);
+        } catch { toast.error('Failed to delete note'); }
     };
 
     const handleAddCustomer = async () => {
@@ -562,6 +614,140 @@ export default function Customers() {
                                         </div>
                                     </div>
 
+                                    {/* Deals & Pipeline */}
+                                    {(customerDeals.length > 0 || dealSummary.total_deals > 0) && (
+                                        <div>
+                                            <h3 className="text-sm font-semibold text-neutral-900 mb-3 flex items-center gap-2">
+                                                <Handshake size={16} />
+                                                Deals & Pipeline
+                                            </h3>
+                                            {/* Deal stats row */}
+                                            <div className="grid grid-cols-3 gap-3 mb-3">
+                                                <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-200 text-center">
+                                                    <Trophy size={16} className="mx-auto text-emerald-600 mb-1" />
+                                                    <p className="text-lg font-bold text-emerald-700">{dealSummary.won_deals || 0}</p>
+                                                    <p className="text-[10px] text-emerald-600">Won (₹{Number(dealSummary.won_value || 0).toLocaleString('en-IN')})</p>
+                                                </div>
+                                                <div className="bg-blue-50 rounded-lg p-3 border border-blue-200 text-center">
+                                                    <Handshake size={16} className="mx-auto text-blue-600 mb-1" />
+                                                    <p className="text-lg font-bold text-blue-700">{dealSummary.active_deals || 0}</p>
+                                                    <p className="text-[10px] text-blue-600">Active (₹{Number(dealSummary.pipeline_value || 0).toLocaleString('en-IN')})</p>
+                                                </div>
+                                                <div className="bg-red-50 rounded-lg p-3 border border-red-200 text-center">
+                                                    <XCircle size={16} className="mx-auto text-red-600 mb-1" />
+                                                    <p className="text-lg font-bold text-red-700">{dealSummary.lost_deals || 0}</p>
+                                                    <p className="text-[10px] text-red-600">Lost</p>
+                                                </div>
+                                            </div>
+                                            {/* Deals list */}
+                                            <div className="space-y-2 max-h-48 overflow-y-auto">
+                                                {customerDeals.map((deal: any) => {
+                                                    const stageColors: Record<string, string> = {
+                                                        Lead: 'bg-neutral-100 text-neutral-700',
+                                                        Qualified: 'bg-blue-100 text-blue-700',
+                                                        Proposal: 'bg-purple-100 text-purple-700',
+                                                        Negotiation: 'bg-amber-100 text-amber-700',
+                                                        'Closed Won': 'bg-emerald-100 text-emerald-700',
+                                                        'Closed Lost': 'bg-red-100 text-red-700',
+                                                    };
+                                                    return (
+                                                        <div key={deal.id} className="flex items-center gap-3 p-2 rounded-lg border border-neutral-200 bg-white hover:border-primary-300 transition-all">
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm font-medium text-neutral-900 truncate">{deal.title}</p>
+                                                                <p className="text-xs text-neutral-500">₹{Number(deal.value || 0).toLocaleString('en-IN')}</p>
+                                                            </div>
+                                                            <Badge className={`text-[10px] px-2 py-0.5 ${stageColors[deal.stage] || 'bg-neutral-100 text-neutral-600'}`}>
+                                                                {deal.stage}
+                                                            </Badge>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Notes / Interactions */}
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-neutral-900 mb-3 flex items-center gap-2">
+                                            <MessageSquare size={16} />
+                                            Notes & Interactions
+                                        </h3>
+                                        {/* Add note form */}
+                                        <div className="flex gap-2 mb-3">
+                                            <select
+                                                value={newNoteType}
+                                                onChange={e => setNewNoteType(e.target.value)}
+                                                className="px-2 py-1.5 border border-neutral-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            >
+                                                <option value="general">General</option>
+                                                <option value="call_log">Call Log</option>
+                                                <option value="meeting_notes">Meeting</option>
+                                                <option value="complaint">Complaint</option>
+                                                <option value="feedback">Feedback</option>
+                                                <option value="internal">Internal</option>
+                                            </select>
+                                            <input
+                                                value={newNoteText}
+                                                onChange={e => setNewNoteText(e.target.value)}
+                                                onKeyDown={e => e.key === 'Enter' && handleAddNote()}
+                                                placeholder="Write a note..."
+                                                className="flex-1 px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            />
+                                            <Button size="sm" onClick={handleAddNote} disabled={!newNoteText.trim()} title="Add note">
+                                                <Send size={14} />
+                                            </Button>
+                                        </div>
+                                        {/* Notes list */}
+                                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                                            {notesLoading ? (
+                                                <p className="text-xs text-neutral-400 text-center py-3">Loading notes...</p>
+                                            ) : customerNotes.length > 0 ? (
+                                                customerNotes.map((note: any) => {
+                                                    const typeLabels: Record<string, { label: string; color: string }> = {
+                                                        general: { label: 'General', color: 'bg-neutral-100 text-neutral-600' },
+                                                        call_log: { label: 'Call', color: 'bg-blue-100 text-blue-700' },
+                                                        meeting_notes: { label: 'Meeting', color: 'bg-purple-100 text-purple-700' },
+                                                        complaint: { label: 'Complaint', color: 'bg-red-100 text-red-700' },
+                                                        feedback: { label: 'Feedback', color: 'bg-amber-100 text-amber-700' },
+                                                        internal: { label: 'Internal', color: 'bg-cyan-100 text-cyan-700' },
+                                                    };
+                                                    const meta = typeLabels[note.note_type] || typeLabels.general;
+                                                    return (
+                                                        <div key={note.id} className={`p-2.5 rounded-lg border transition-all ${
+                                                            note.is_pinned ? 'border-amber-300 bg-amber-50' : 'border-neutral-200 bg-white'
+                                                        }`}>
+                                                            <div className="flex items-start justify-between gap-2">
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center gap-1.5 mb-1">
+                                                                        <Badge className={`text-[10px] px-1.5 py-0 ${meta.color}`}>{meta.label}</Badge>
+                                                                        {note.is_pinned && <Pin size={10} className="text-amber-500" />}
+                                                                        <span className="text-[10px] text-neutral-400">
+                                                                            {new Date(note.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="text-xs text-neutral-700 whitespace-pre-wrap">{note.content}</p>
+                                                                    {note.author_name && (
+                                                                        <p className="text-[10px] text-neutral-400 mt-1">— {note.author_name}</p>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex gap-0.5 flex-shrink-0">
+                                                                    <button onClick={() => handleTogglePin(note.id)} className="p-1 hover:bg-amber-100 rounded transition-colors" title="Pin">
+                                                                        <Pin size={12} className={note.is_pinned ? 'text-amber-500' : 'text-neutral-300'} />
+                                                                    </button>
+                                                                    <button onClick={() => handleDeleteNote(note.id)} className="p-1 hover:bg-red-50 rounded transition-colors" title="Delete">
+                                                                        <Trash2 size={12} className="text-neutral-300" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })
+                                            ) : (
+                                                <p className="text-xs text-neutral-400 text-center py-3">No notes yet — add one above</p>
+                                            )}
+                                        </div>
+                                    </div>
+
                                     {/* Purchase History */}
                                     <div>
                                         <h3 className="text-sm font-semibold text-neutral-900 mb-3 flex items-center gap-2">
@@ -620,10 +806,6 @@ export default function Customers() {
                                                 <p className="text-center text-neutral-500 py-4 text-sm">No purchases yet</p>
                                             )}
                                         </div>
-                                    </div>
-                                    {/* Customer Notes */}
-                                    <div className="pt-6 border-t border-neutral-200">
-                                        <CustomerNotes customerId={selectedCustomer.id} />
                                     </div>
                                 </CardContent>
                             </>
