@@ -1,4 +1,4 @@
-# AstroCRM - Customer Relationship Management System
+# 🚀 AstroCRM v3.0 — AI-Powered Customer Relationship Management
 
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -7,567 +7,341 @@
 ![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)
 ![Express](https://img.shields.io/badge/Express.js-4-000000?logo=express&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791?logo=postgresql&logoColor=white)
+![AI](https://img.shields.io/badge/AI-ASI:One-8B5CF6?logo=openai&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
-A full-featured retail CRM web application with PostgreSQL backend, ML-powered customer segmentation, stock management, online store integration, and comprehensive reporting.
+> A full-stack, AI-powered retail CRM with ML analytics, sales pipeline, real-time dashboards, and an intelligent chatbot — built with React, Node.js, PostgreSQL, and ASI:One AI.
 
-## Features
+**Created by AH AH Coders × Claude AI** 🤝
 
-### Core CRM Functionality
-- **Contact Management**: Complete CRUD operations for customer contacts
-- **Sales Pipeline**: Visual Kanban board for deal tracking
-- **Activity Tracking**: Log calls, meetings, emails, and tasks
-- **Dashboard**: Real-time KPIs and metrics
+---
 
-### Stock & Inventory Management
-- **Product Catalog**: Manage products with SKU and barcode support
-- **Barcode Scanning**: Real-time inventory tracking with barcode camera
-- **Stock Transactions**: Complete audit trail of all stock changes (in, out, adjustments)
-- **Low Stock Alerts**: Automatic notifications for products below minimum level
-- **Multi-channel**: Online store + retail inventory unified
+## ✨ Key Features
 
-### Data Import & Sync
-- **CSV/XLSX Support**: Import customers, products, and inventory data
-- **Google Sheets Sync**: Auto-sync every 60 seconds from shared spreadsheets
-- **Smart Field Mapping**: Automatic field detection and mapping
-- **Bulk Operations**: Process thousands of records efficiently
+### 🧠 AI-Powered Intelligence
+- **DB-Aware AI Chatbot** — Ask natural language questions like *"Who is my top customer?"* and get answers from your real database
+- **AI Description Helper** — ✨ AI Suggest button auto-writes professional descriptions for activities, deals, and notes
+- **AI Dashboard Summary** — One-click executive briefing of your business health
+- **AI Segment Explainer** — Plain-English explanations of your customer clusters
+- **AI Campaign Generator** — Generates SMS marketing copy tailored to your audience
+- **AI Customer Risk Assessment** — Predicts individual customer churn probability
+- **AI Sales Forecasting** — Revenue projection with confidence scoring
+- **AI Report Summaries** — Executive-level automated report narratives
 
-### ML Analytics
-- **K-means Clustering**: Automatic customer segmentation based on RFM analysis
-- **Customer Insights**: Identify Champions, Loyal Customers, At-Risk, and Lost segments
-- **Visual Analytics**: Interactive scatter plots and charts
+### 📊 7 ML Analytics Modules
+| Module | What It Does |
+|--------|-------------|
+| **K-Means Segmentation** | Groups customers into behavioral clusters (Champions, Loyal, At-Risk, Lost) |
+| **RFM Analysis** | Scores every customer on Recency, Frequency, and Monetary value (1-5 scale) |
+| **Churn Risk Prediction** | Identifies at-risk customers with risk scores and recommended actions |
+| **Customer LTV** | Predicts 3-year Customer Lifetime Value with tier classification |
+| **Product Affinity** | Discovers which products are frequently purchased together |
+| **Revenue Forecasting** | 90-day trend analysis with 7-day moving average and projections |
+| **Cohort Analysis** | Monthly acquisition cohorts with retention rates and revenue tracking |
 
-### Report Generation
-- **Multiple Formats**: Export reports as PDF or Excel
-- **Report Types**: Sales reports, customer reports, segment analysis
-- **Customizable**: Filter by date range, region, category
+### 🤝 Sales Pipeline (Deals)
+- Visual Kanban-style pipeline with drag-and-drop stage changes
+- Stages: Lead → Qualified → Proposal → Negotiation → Closed Won / Closed Lost
+- **Auto-sync**: When a deal is won/lost, customer's `total_spent` and `total_purchases` are automatically updated
+- Deal stats visible on Customer detail page (Won / Active / Lost counts with values)
 
-### Online Store Integration
-- **Product Display**: Browse and purchase products online
-- **Cart & Checkout**: Shopping cart with discount codes
-- **Order Management**: Track online orders with status updates
-- **Coupon System**: Discount codes and promotional campaigns
+### 👥 Customer 360° View
+- Contact information with phone, email, location
+- **Purchase History** with itemized breakdowns
+- **Deals & Pipeline** section showing deal stats and list
+- **Notes & Interactions** — Add, pin, delete notes by type (General, Call, Meeting, Complaint, Feedback, Internal)
+- **Activities & Follow-Ups** — View linked tasks, calls, meetings with overdue alerts
 
-## Technology Stack
+### 📋 Tasks & Activities
+- Stats dashboard (Total / Pending / Completed / Overdue)
+- Filter by type (Call, Meeting, Email, Task, Follow-up, Note)
+- Filter by priority and completion status
+- Toggle completion, CRUD operations via modals
+- Associate activities with customers
+
+### 📈 Dashboard & Insights
+- Real-time KPIs: Total Customers, Active, Revenue, VIP count
+- Revenue trend charts and growth metrics
+- AI-powered dashboard summary with one click
+
+### 📣 Campaigns
+- SMS/Email campaign management
+- Audience targeting by customer segment
+- AI-generated campaign messages
+- Send tracking per customer
+
+### 📄 Reports
+- PDF and Excel export
+- Sales, Customer, and Segment reports
+- AI-generated executive summaries
+- Monthly business reports with date filtering
+
+### 🛒 Online Store
+- Public storefront with product display
+- Cart, checkout, and order management
+- Coupon/discount code system
+- QR code generation for products
+
+### 📦 Inventory / Stock Management
+- Product catalog with SKU tracking
+- Stock in/out transactions with audit trail
+- Low stock alerts
+- Barcode scanning support
+
+### 📤 Data Import
+- CSV and XLSX file import for customers and products
+- Google Sheets auto-sync (every 60 seconds)
+- Smart field mapping
+
+### 👤 User Roles
+- Admin / Manager / Viewer role-based access
+- JWT authentication with token refresh
+
+---
+
+## 🛠 Technology Stack
 
 ### Backend
-- **Runtime**: Node.js with TypeScript
-- **Framework**: Express.js 4
-- **Database**: PostgreSQL 17 (node-postgres)
-- **ML**: Custom K-means implementation
-- **File Processing**: multer, csv-parser, exceljs
-- **Reports**: pdfkit, exceljs
-- **AI Integration**: Groq SDK for AI chat features
+| Technology | Purpose |
+|-----------|---------|
+| **Node.js + TypeScript** | Server runtime |
+| **Express.js 4** | REST API framework |
+| **PostgreSQL 17** | Relational database |
+| **pg (node-postgres)** | Database driver with connection pooling |
+| **ASI:One (OpenAI-compatible)** | AI/ML inference engine |
+| **pdfkit** | PDF report generation |
+| **exceljs** | Excel report generation |
+| **jsonwebtoken** | JWT authentication |
+| **multer** | File upload handling |
+| **csv-parser** | CSV file parsing |
+| **node-cron** | Scheduled tasks |
 
 ### Frontend
-- **Framework**: React + TypeScript
-- **Build Tool**: Vite 7
-- **Routing**: React Router v7
-- **Styling**: Tailwind CSS 3
-- **Charts**: Recharts
-- **Icons**: Lucide React
-- **HTTP Client**: Axios
+| Technology | Purpose |
+|-----------|---------|
+| **React 19 + TypeScript** | UI framework |
+| **Vite 7** | Build tool and dev server |
+| **React Router v7** | Client-side routing |
+| **Tailwind CSS 3** | Utility-first CSS framework |
+| **Recharts** | Charts and data visualization |
+| **Lucide React** | Icon library (200+ icons) |
+| **Axios** | HTTP client with interceptors |
+| **react-hot-toast** | Toast notifications |
+| **Radix UI** | Headless UI primitives (Dialog, Dropdown) |
+| **html2canvas + jspdf** | Client-side PDF generation |
 
-### Database (PostgreSQL)
-- **Version**: PostgreSQL 17
-- **Tables**: 12 tables (users, customers, purchases, products, inventory_transactions, campaigns, google_sheets_sync, store_settings, online_orders, coupons, activities, and more)
-- **Connection**: Node-postgres (pg) with connection pooling
+### Database
+| Table | Purpose |
+|-------|---------|
+| `users` | User accounts and authentication |
+| `customers` | Customer contact information and aggregates |
+| `purchases` | Purchase/order records with itemized details |
+| `products` | Product catalog with prices and stock |
+| `inventory_transactions` | Stock movement audit trail |
+| `campaigns` | Email/SMS marketing campaigns |
+| `campaign_sends` | Individual campaign message records |
+| `customer_segments` | K-means clustering results |
+| `store_settings` | Online store configuration |
+| `online_orders` | Orders from online storefront |
+| `coupons` | Discount codes and promotions |
+| `deals` | Sales pipeline deals |
+| `activities` | CRM activity tracking (calls, meetings, tasks) |
+| `notes` | Customer interaction notes |
 
 ---
 
-# INSTALLATION GUIDE
+## 🚀 Quick Start
 
-## Prerequisites
-
-**Before starting, you MUST install PostgreSQL 17 on your system.**
-
-### Requirements
+### Prerequisites
 - Node.js 18+ and npm
-- PostgreSQL 17 (see instructions below)
-- Git (optional, for version control)
+- PostgreSQL 17
+- Git
 
----
-
-## STEP 1: Download & Install PostgreSQL 17
-
-### Windows Installation
-
-#### Option A: Direct Download from EDB (Recommended)
-
-1. **Go to PostgreSQL download page:**
-   - Visit: https://www.postgresql.org/download/windows/
-   - Click "**Download the installer**" → Download PostgreSQL 17 for Windows x86-64
-
-2. **Run the PostgreSQL Installer:**
-   - Double-click the downloaded `.exe` file (e.g., `postgresql-17.9-2-windows-x64.exe`)
-   - Click through the setup wizard
-
-3. **Important Setup Options:**
-
-   | Setting | Value |
-   |---------|-------|
-   | Installation Directory | Use default `C:\Program Files\PostgreSQL\17` |
-   | Password | **Set to: `postgres`** (important!) |
-   | Port | `5432` (default) |
-   | Locale | Your system locale |
-   | pgAdmin 4 | ✅ Check (optional, but helpful) |
-   | Stack Builder | ❌ Uncheck (not needed) |
-
-4. **Complete the installation:**
-   - Click "Finish" to complete
-   - PostgreSQL service will start automatically
-
-5. **Verify Installation:**
-   - Open Command Prompt or PowerShell
-   - Run this command:
-   ```bash
-   psql --version
-   ```
-   - You should see: `psql (PostgreSQL) 17.9`
-
-#### Option B: Using Windows Package Manager (if available)
-
-```powershell
-winget install PostgreSQL.PostgreSQL.17
-```
-
-### macOS Installation
+### Setup
 
 ```bash
-# Using Homebrew
-brew install postgresql@17
-brew services start postgresql@17
+# 1. Clone the project
+git clone <your-repo-url>
+cd Astro_CRM
 
-# Or download DMG from: https://www.postgresql.org/download/macosx/
-```
+# 2. Create PostgreSQL database
+psql -U postgres -c "CREATE DATABASE astrocrm;"
 
-### Linux Installation
-
-**Ubuntu/Debian:**
-```bash
-sudo apt-get update
-sudo apt-get install postgresql postgresql-contrib postgresql-17
-sudo systemctl start postgresql
-```
-
-**Fedora/RHEL:**
-```bash
-sudo dnf install postgresql postgresql-server postgresql-contrib
-sudo systemctl start postgresql
-```
-
----
-
-## STEP 2: Create the AstroCRM Database
-
-After PostgreSQL is installed and running, create the database.
-
-### Option A: Using Command Line (All Platforms)
-
-```bash
-# Connect to PostgreSQL
-psql -U postgres
-
-# Inside psql prompt, run:
-CREATE DATABASE astrocrm;
-\q
-```
-
-### Option B: Using pgAdmin (GUI - Windows/macOS)
-
-1. Open **pgAdmin 4** (installed with PostgreSQL, or access at `http://localhost:5050`)
-2. Login with password `postgres`
-3. Right-click **Databases** → **Create** → **Database**
-4. Name: `astrocrm`
-5. Click "Save"
-
-### Verify Database Creation
-
-```bash
-psql -U postgres -d astrocrm -c "\dt"
-```
-
----
-
-## STEP 3: Configure Backend Environment
-
-Navigate to the backend directory and create `.env` file with database credentials.
-
-```bash
+# 3. Configure backend
 cd backend
+cp .env.example .env   # Edit with your DB credentials
+npm install
+
+# 4. Configure frontend
+cd ../frontend
+npm install
+
+# 5. Start backend (Terminal 1)
+cd backend
+npm run dev
+# → Listening on port 3001
+
+# 6. Start frontend (Terminal 2)
+cd frontend
+npm run dev
+# → http://localhost:5173
 ```
 
-**Create `.env` file:** (or copy from `.env.example`)
-
+### Environment Variables (`backend/.env`)
 ```env
-# Server Configuration
 PORT=3001
-JWT_SECRET=your-secret-key-change-this-in-production
-
-# PostgreSQL Database Configuration
+JWT_SECRET=your-secret-key
 PG_USER=postgres
 PG_PASSWORD=postgres
 PG_HOST=localhost
 PG_PORT=5432
 PG_DATABASE=astrocrm
-
-# AI/ML Services (optional)
-GROQ_API_KEY=gsk_your_groq_api_key_here
-```
-
-**Important:**
-- `PG_USER`: Default PostgreSQL user is `postgres`
-- `PG_PASSWORD`: The password you set during PostgreSQL installation
-- `PG_HOST`: `localhost` or `127.0.0.1` for local development
-- `PG_PORT`: Default PostgreSQL port is `5432`
-- `PG_DATABASE`: Must match the database name you created (`astrocrm`)
-
----
-
-## STEP 4: Install Project Dependencies
-
-### Backend Setup
-
-```bash
-cd backend
-npm install
-npm run build  # Verify TypeScript compiles
-```
-
-### Frontend Setup
-
-```bash
-cd frontend
-npm install
-npm run build  # Verify build succeeds
+ASI_ONE_API_KEY=your-asi-one-api-key  # For AI features
 ```
 
 ---
 
-## STEP 5: Run the Application
+## 📁 Project Structure
 
-Open **two terminal windows** (or use tab splits).
-
-### Terminal 1: Start Backend API
-
-```bash
-cd backend
-npm run dev
 ```
-
-**Expected output:**
+Astro_CRM/
+├── backend/
+│   ├── src/
+│   │   ├── database/
+│   │   │   ├── db.ts                # PostgreSQL connection & helpers
+│   │   │   └── schema-pg.sql        # Database schema
+│   │   ├── routes/
+│   │   │   ├── ai.ts                # AI endpoints (chat, summary, forecast)
+│   │   │   ├── aihelper.ts          # ASI:One integration + DB query templates
+│   │   │   ├── analytics.ts         # ML analytics (K-means, RFM, Churn, LTV, etc.)
+│   │   │   ├── activities.ts        # Activity/task tracking
+│   │   │   ├── campaigns.ts         # Marketing campaigns
+│   │   │   ├── customers.ts         # Customer CRUD + deal sync
+│   │   │   ├── deals.ts             # Sales pipeline + customer sync
+│   │   │   ├── insights.ts          # Business insights/metrics
+│   │   │   ├── notes.ts             # Customer notes/interactions
+│   │   │   ├── products.ts          # Product catalog
+│   │   │   ├── purchases.ts         # Purchase tracking
+│   │   │   └── reports.ts           # PDF/Excel report generation
+│   │   ├── services/
+│   │   │   └── mlService.ts         # K-means clustering implementation
+│   │   └── server.ts                # Express server entry point
+│   └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── ui/                  # Reusable UI components (Button, Card, Modal, etc.)
+│   │   │   ├── AIAssistant.tsx      # Floating AI chatbot panel
+│   │   │   └── Layout.tsx           # App layout with sidebar navigation
+│   │   ├── pages/
+│   │   │   ├── Dashboard.tsx        # Main dashboard with KPIs
+│   │   │   ├── Customers.tsx        # Customer 360° (Notes, Deals, Activities, Purchases)
+│   │   │   ├── Deals.tsx            # Sales pipeline Kanban board
+│   │   │   ├── Activities.tsx       # Task & activity management
+│   │   │   ├── Analytics.tsx        # 7 ML analytics modules (tabbed)
+│   │   │   ├── Campaigns.tsx        # Campaign management
+│   │   │   ├── Insights.tsx         # Business insights & trends
+│   │   │   ├── Reports.tsx          # Report generation
+│   │   │   └── ...                  # Stock, Store, Import, Users pages
+│   │   ├── services/
+│   │   │   └── api.ts               # Centralized API service layer
+│   │   └── App.tsx                  # Root component with routing
+│   └── package.json
+├── sample-data/                     # Sample CSV/XLSX files for testing
+└── README.md                        # This file
 ```
-listening on port 3001
-Database initialized successfully (PostgreSQL)
-```
-
-### Terminal 2: Start Frontend UI
-
-```bash
-cd frontend
-npm run dev
-```
-
-**Expected output:**
-```
-  VITE v7.3.1  ready in XXX ms
-
-  ➜  Local:   http://localhost:5173/
-```
-
-### Access the Application
-
-- **Frontend URL**: http://localhost:5173
-- **Backend API**: http://localhost:3001
-- **pgAdmin (optional)**: http://localhost:5050
 
 ---
 
-# USAGE GUIDE
-
-## 1. Register/Login
-
-1. Open http://localhost:5173 in your browser
-2. Click "Sign Up" to create a new account
-3. Or use existing credentials if available
-
-## 2. Import Data
-
-**Customers:**
-1. Navigate to **Import** tab
-2. Go to **Upload File** section
-3. Upload a CSV or XLSX file with customer data
-4. Click "Import Customers"
-
-**Products & Inventory:**
-1. Navigate to **Import** tab
-2. Go to **Stock Import** section
-3. Upload CSV/Excel with product and stock data
-4. Click "Import Products"
-
-**Google Sheets Sync:**
-1. Navigate to **Import** tab
-2. Go to **Google Sheets** section
-3. Configure your shared Google Sheets URL
-4. Auto-syncs every 60 seconds
-
-## 3. View Dashboard
-
-- See real-time metrics and KPIs
-- View sales trends over time
-- Check recent activities and alerts
-
-## 4. Manage Customers
-
-1. Go to **Customers** tab
-2. View customer list with pagination
-3. Click customer name to edit or delete
-4. Add new customers with "Add Customer" button
-5. Track customer type (buyer/seller/both)
-6. View purchase history
-
-## 5. Manage Stock
-
-1. Go to **Inventory** tab
-2. View all products with current stock levels
-3. Use **Barcode Scanner** to update stock in real-time
-4. View transaction history for each product
-5. Set minimum/maximum stock levels
-6. Get low-stock alerts
-
-## 6. Track Purchases
-
-1. Go to **Customers** tab
-2. Click on a customer
-3. Add purchase with items and payment method
-4. View purchase history and totals
-
-## 7. Run Analytics
-
-1. Click **AI Studio** or **Analytics** tab
-2. Run K-means segmentation to identify customer groups
-3. View visualizations and insights
-4. Export segment data
-
-## 8. Generate Reports
-
-1. Go to **Reports** tab
-2. Select report type:
-   - **Sales Reports**: Revenue, quantity, trends
-   - **Customer Reports**: Details, segments, lifetime value
-   - **Inventory Reports**: Stock levels, movements
-3. Choose output format: PDF or Excel
-4. Download the generated report
-
----
-
-# DATABASE STRUCTURE
-
-PostgreSQL tables created automatically on first run:
-
-| Table | Purpose |
-|-------|---------|
-| `users` | User accounts and authentication |
-| `customers` | Customer contact information |
-| `purchases` | Purchase/order records |
-| `products` | Product catalog with prices and stock |
-| `inventory_transactions` | Stock movement audit trail |
-| `campaigns` | Email/SMS marketing campaigns |
-| `campaign_sends` | Individual campaign message records |
-| `customer_segments` | ML clustering results |
-| `google_sheets_sync` | Google Sheets sync configuration |
-| `store_settings` | Online store configuration |
-| `online_orders` | Orders from online store |
-| `coupons` | Discount codes |
-
-**Auto-initialization:** The database schema is created automatically when the backend starts for the first time.
-
----
-
-# API ENDPOINTS
+## 📡 API Endpoints
 
 ### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login user
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/register` | Register new user |
+| POST | `/api/auth/login` | Login and get JWT |
+| GET | `/api/auth/me` | Get current user |
 
 ### Customers
-- `GET /api/customers` - Get all customers (with pagination)
-- `POST /api/customers` - Create customer
-- `PUT /api/customers/:id` - Update customer
-- `DELETE /api/customers/:id` - Delete customer
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/customers` | List all customers |
+| GET | `/api/customers/:id` | Get customer + deals + purchases |
+| POST | `/api/customers` | Create customer |
+| PUT | `/api/customers/:id` | Update customer |
+| DELETE | `/api/customers/:id` | Delete customer |
 
-### Products
-- `GET /api/products` - Get all products
-- `POST /api/products` - Create product
-- `PUT /api/products/:id` - Update product
-- `DELETE /api/products/:id` - Delete product
+### Deals Pipeline
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/deals` | List all deals |
+| POST | `/api/deals` | Create deal |
+| PUT | `/api/deals/:id` | Update deal (auto-syncs customer) |
+| PATCH | `/api/deals/:id/stage` | Change deal stage (Kanban drag) |
+| DELETE | `/api/deals/:id` | Delete deal |
 
-### Inventory
-- `POST /api/inventory/products` - Add product to inventory
-- `POST /api/inventory/scan-barcode` - Barcode scan (update stock)
-- `GET /api/inventory/dashboard-stats` - Stock KPIs
-- `GET /api/inventory/transactions` - Stock transaction history
+### AI Intelligence
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/ai/chat` | DB-aware AI chatbot |
+| POST | `/api/ai/autocomplete` | AI description helper |
+| POST | `/api/ai/dashboard-summary` | AI dashboard briefing |
+| POST | `/api/ai/explain-analytics` | AI segment explanation |
+| POST | `/api/ai/generate-campaign` | AI campaign copy |
+| POST | `/api/ai/customer-risk` | AI churn assessment |
+| POST | `/api/ai/sales-forecast` | AI revenue prediction |
+| POST | `/api/ai/report-summary` | AI report narrative |
 
-### Purchases
-- `POST /api/purchases` - Create purchase
-- `GET /api/purchases` - Get all purchases
-- `DELETE /api/purchases/:id` - Delete purchase
-
-### Campaigns
-- `GET /api/campaigns` - List campaigns
-- `POST /api/campaigns` - Create campaign
-- `POST /api/campaigns/:id/send` - Send campaign
-
-### Google Sheets
-- `POST /api/google-sheets/setup` - Configure sync
-- `POST /api/google-sheets/import-csv` - Bulk import
-
-### Reports
-- `POST /api/reports/sales` - Generate sales report
-- `POST /api/reports/customers` - Generate customer report
-- `POST /api/reports/inventory` - Generate inventory report
-
-### Analytics
-- `GET /api/analytics/dashboard` - Dashboard metrics
-- `POST /api/analytics/segment-customers` - Run K-means clustering
-- `GET /api/analytics/segments` - Get segments
-
----
-
-# TROUBLESHOOTING
-
-## PostgreSQL Issues
-
-### "psql: command not found"
-**Solution:** PostgreSQL is not in your system PATH.
-1. Add `C:\Program Files\PostgreSQL\17\bin` to your Windows PATH
-2. Or use full path: `C:\Program Files\PostgreSQL\17\bin\psql.exe -U postgres`
-
-### "Connection refused" (backend won't start)
-**Solution:** PostgreSQL service is not running.
-- **Windows:** Search "Services" → Find "postgresql-17" → Click "Start"
-- **macOS:** `brew services start postgresql@17`
-- **Linux:** `sudo systemctl start postgresql`
-
-### "Database astrocrm does not exist"
-**Solution:** Run the database creation command:
-```bash
-psql -U postgres -c "CREATE DATABASE astrocrm;"
-```
-
-### "Password authentication failed"
-**Solution:** The `.env` password doesn't match PostgreSQL password.
-1. Verify your PostgreSQL password (set during installation)
-2. Update `PG_PASSWORD` in backend `.env` file
-3. Restart backend: `npm run dev`
-
-### Port 5432 already in use
-**Solution:** PostgreSQL is running on a different port or another service uses it.
-```bash
-# Find what's using port 5432
-netstat -ano | findstr :5432  # Windows
-lsof -i :5432                  # macOS/Linux
-
-# Or configure PostgreSQL to use different port in .env:
-PG_PORT=5433
-```
-
-## Backend Issues
-
-### "EADDRINUSE: address already in use :::3001"
-**Solution:** Port 3001 is already in use.
-```bash
-# Kill the process or change port in .env
-PORT=3002
-```
-
-### "Cannot find module 'pg'"
-**Solution:** Dependencies not installed.
-```bash
-cd backend
-npm install
-```
-
-### TypeScript build errors
-**Solution:** Run type checker before building.
-```bash
-cd backend
-npm run build
-```
-
-## Frontend Issues
-
-### "EADDRINUSE: address already in use :::5173"
-**Solution:** Port 5173 is already in use.
-```bash
-cd frontend
-npm run dev -- --port 5174
-```
-
-### White screen after login
-**Solution:** Backend is not running or API calls are failing.
-1. Check backend is running: `cd backend && npm run dev`
-2. Check browser console for errors (F12 → Console tab)
-3. Verify API URL in `.env` or config
+### ML Analytics
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/analytics/segment-customers` | Run K-means clustering |
+| GET | `/api/analytics/segments` | Get segment results |
+| GET | `/api/analytics/rfm-analysis` | RFM scoring |
+| GET | `/api/analytics/churn-risk` | Churn prediction |
+| GET | `/api/analytics/customer-ltv` | Customer LTV |
+| GET | `/api/analytics/product-affinity` | Product affinity |
+| GET | `/api/analytics/revenue-forecast` | Revenue forecasting |
+| GET | `/api/analytics/cohort-analysis` | Cohort analysis |
 
 ---
 
-# BUILD & DEPLOYMENT
+## 🧪 Sample Data
 
-### Production Build
+Sample data files in `sample-data/` folder:
+- `sample-customers-large.csv` — 550 realistic customer records
+- `sample-products-large.csv` — 550 product records with inventory
 
-```bash
-# Backend
-cd backend
-npm run build
-NODE_ENV=production npm start
-
-# Frontend
-cd frontend
-npm run build
-# Deploy dist/ folder to hosting
-```
-
-### Environment Variables for Production
-
-**`backend/.env` (Production)**
-```env
-PORT=3001
-NODE_ENV=production
-JWT_SECRET=your-very-secure-secret-key-here-change-this
-
-# PostgreSQL (use your production database)
-PG_USER=astrocrm_user
-PG_PASSWORD=your-secure-password
-PG_HOST=your-database-host.com
-PG_PORT=5432
-PG_DATABASE=astrocrm
-```
+Import via the **Import Data** page.
 
 ---
 
-# Sample Data
+## 🔒 Security
 
-Sample data files are available in the `sample-data/` folder:
-- `sample-customers-large.csv` - 550 realistic customer records
-- `sample-products-large.csv` - 550 product records with inventory
-
-Import these files via the **Import** tab to populate test data.
+- JWT-based authentication with token expiry
+- Password hashing with bcrypt
+- Role-based access control (Admin / Manager / Viewer)
+- API route protection via middleware
 
 ---
 
-# License
+## 📜 License
 
-MIT
+MIT License
 
-## Author
+---
 
-Built with ❤️ using React, Node.js, PostgreSQL, TypeScript, and Machine Learning
+## 👨‍💻 Authors
 
-## Support
+**Created by AH AH Coders × Claude AI** 🤝
 
-For issues or questions:
-1. Check the **Troubleshooting** section above
+Built with ❤️ using React, Node.js, PostgreSQL, TypeScript, ASI:One AI, and Machine Learning
+
+---
+
+## 🆘 Support
+
+1. Check the **Troubleshooting** section in the old README
 2. Check backend logs: `cd backend && npm run dev`
-3. Check frontend console: Open browser → F12 → Console tab
-4. Check database connection: `psql -U postgres -d astrocrm`
+3. Check frontend console: Browser → F12 → Console tab
+4. Check database: `psql -U postgres -d astrocrm`
