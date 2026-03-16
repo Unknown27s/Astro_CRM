@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { customers, purchases, notes } from '../services/api';
+import { customers, purchases, notes, activities } from '../services/api';
 import toast from 'react-hot-toast';
 import {
     Users,
@@ -18,6 +18,9 @@ import {
     MessageSquare,
     Pin,
     Send,
+    CalendarCheck,
+    CheckCircle2,
+    Clock,
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -37,6 +40,7 @@ export default function Customers() {
     const [newNoteText, setNewNoteText] = useState('');
     const [newNoteType, setNewNoteType] = useState('general');
     const [notesLoading, setNotesLoading] = useState(false);
+    const [customerActivities, setCustomerActivities] = useState<any[]>([]);
     const [showAddCustomer, setShowAddCustomer] = useState(false);
     const [showEditCustomer, setShowEditCustomer] = useState(false);
     const [showAddPurchase, setShowAddPurchase] = useState(false);
@@ -116,8 +120,16 @@ export default function Customers() {
             console.error('Error fetching customer details:', error);
             toast.error('Failed to load customer details');
         }
-        // Fetch notes separately
+        // Fetch notes and activities separately
         fetchCustomerNotes(customer.id);
+        fetchCustomerActivities(customer.id);
+    };
+
+    const fetchCustomerActivities = async (customerId: number) => {
+        try {
+            const res = await activities.getByCustomer(customerId);
+            setCustomerActivities(res.data.activities || []);
+        } catch { /* ignore */ }
     };
 
     const fetchCustomerNotes = async (customerId: number) => {
@@ -747,6 +759,58 @@ export default function Customers() {
                                             )}
                                         </div>
                                     </div>
+
+                                    {/* Activities / Follow-ups */}
+                                    {customerActivities.length > 0 && (
+                                        <div>
+                                            <h3 className="text-sm font-semibold text-neutral-900 mb-3 flex items-center gap-2">
+                                                <CalendarCheck size={16} />
+                                                Activities & Follow-Ups
+                                                <Badge variant="secondary" className="text-[10px]">{customerActivities.length}</Badge>
+                                            </h3>
+                                            <div className="space-y-2 max-h-48 overflow-y-auto">
+                                                {customerActivities.map((act: any) => {
+                                                    const typeColors: Record<string, string> = {
+                                                        call: 'bg-blue-100 text-blue-700',
+                                                        meeting: 'bg-purple-100 text-purple-700',
+                                                        email: 'bg-cyan-100 text-cyan-700',
+                                                        task: 'bg-amber-100 text-amber-700',
+                                                        follow_up: 'bg-emerald-100 text-emerald-700',
+                                                        note: 'bg-neutral-100 text-neutral-600',
+                                                    };
+                                                    const isOverdue = !act.completed && act.due_date && new Date(act.due_date) < new Date();
+                                                    return (
+                                                        <div key={act.id} className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                                                            act.completed ? 'border-neutral-200 bg-neutral-50 opacity-60' :
+                                                            isOverdue ? 'border-red-300 bg-red-50' : 'border-neutral-200 bg-white'
+                                                        }`}>
+                                                            {act.completed ? (
+                                                                <CheckCircle2 size={14} className="text-emerald-500 flex-shrink-0" />
+                                                            ) : (
+                                                                <Clock size={14} className={`flex-shrink-0 ${isOverdue ? 'text-red-500' : 'text-neutral-400'}`} />
+                                                            )}
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className={`text-xs font-medium truncate ${act.completed ? 'line-through text-neutral-400' : 'text-neutral-900'}`}>
+                                                                    {act.subject}
+                                                                </p>
+                                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                                    <Badge className={`text-[9px] px-1 py-0 ${typeColors[act.type] || 'bg-neutral-100 text-neutral-600'}`}>
+                                                                        {act.type}
+                                                                    </Badge>
+                                                                    {act.due_date && (
+                                                                        <span className={`text-[10px] ${isOverdue ? 'text-red-600 font-medium' : 'text-neutral-400'}`}>
+                                                                            {new Date(act.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                                                            {isOverdue && ' (overdue)'}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Purchase History */}
                                     <div>

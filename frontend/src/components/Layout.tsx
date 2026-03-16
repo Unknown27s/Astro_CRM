@@ -55,18 +55,21 @@ export default function Layout({ setAuth }: LayoutProps) {
     };
 
     const navItems = [
+        // ── Core (high value, used daily) ──
         { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
         { path: '/customers', icon: Users, label: 'Customers' },
-        { path: '/activities', icon: CalendarCheck, label: 'Activities' },
+        { path: '/deals', icon: Handshake, label: 'Deals Pipeline' },
+        { path: '/activities', icon: CalendarCheck, label: 'Tasks & Activities' },
+        { path: '/analytics', icon: Sparkles, label: 'ML Analytics' },
+        { path: '/ai', icon: Cpu, label: 'AI Studio' },
+        // ── Marketing & Reports ──
         { path: '/campaigns', icon: Send, label: 'Campaigns' },
         { path: '/insights', icon: BarChart3, label: 'Insights' },
-        { path: '/analytics', icon: Sparkles, label: 'ML Analytics' },
         { path: '/reports', icon: FileDown, label: 'Reports' },
-        { path: '/import', icon: Upload, label: 'Import Data' },
+        // ── Operations & Admin ──
         { path: '/stock', icon: ShoppingBag, label: 'Stock Management' },
         { path: '/online-store', icon: ShoppingBag, label: 'Online Store' },
-        { path: '/deals', icon: Handshake, label: 'Deals Pipeline' },
-        { path: '/ai', icon: Cpu, label: 'AI Studio' },
+        { path: '/import', icon: Upload, label: 'Import Data' },
         { path: '/users', icon: ShieldCheck, label: 'User Roles' },
     ];
 

@@ -416,4 +416,91 @@ router.get('/product-affinity', async (req: Request, res: Response) => {
     }
 });
 
+// ─── Revenue Forecasting (trend + moving average) ────────────────────────
+router.get('/revenue-forecast', async (req: Request, res: Response) => {
+    try {
+        const dailyRevenue: any[] = await query(`
+            SELECT
+                purchase_date::date as date,
+                SUM(total_amount) as revenue,
+                COUNT(*) as orders
+            FROM purchases
+            WHERE purchase_date >= CURRENT_DATE - INTERVAL '90 days'
+            GROUP BY purchase_date::date
+            ORDER BY date ASC
+        `) as any[];
+
+        // Calculate 7-day moving average
+        const withMovingAvg = dailyRevenue.map((day: any, idx: number) => {
+            const window = dailyRevenue.slice(Math.max(0, idx - 6), idx + 1);
+            const movingAvg = window.reduce((s: number, d: any) => s + Number(d.revenue), 0) / window.length;
+            return {
+                date: day.date,
+                revenue: Number(day.revenue),
+                orders: Number(day.orders),
+                moving_avg_7d: Math.round(movingAvg),
+            };
+        });
+
+        // Simple linear projection for next 30 days
+        const last30 = dailyRevenue.slice(-30);
+        const totalLast30 = last30.reduce((s: number, d: any) => s + Number(d.revenue), 0);
+        const avgDaily = last30.length > 0 ? totalLast30 / last30.length : 0;
+
+        const first15Avg = last30.slice(0, 15).reduce((s: number, d: any) => s + Number(d.revenue), 0) / Math.max(last30.slice(0, 15).length, 1);
+        const last15Avg = last30.slice(-15).reduce((s: number, d: any) => s + Number(d.revenue), 0) / Math.max(last30.slice(-15).length, 1);
+        const trend = first15Avg > 0 ? ((last15Avg - first15Avg) / first15Avg) * 100 : 0;
+
+        res.json({
+            daily_revenue: withMovingAvg,
+            summary: {
+                avg_daily_revenue: Math.round(avgDaily),
+                projected_30d: Math.round(avgDaily * 30),
+                projected_90d: Math.round(avgDaily * 90),
+                trend_percentage: Number(trend.toFixed(1)),
+                trend_direction: trend > 2 ? 'up' : trend < -2 ? 'down' : 'stable',
+                data_points: dailyRevenue.length,
+            },
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ─── Cohort Analysis (customer acquisition cohorts) ──────────────────────
+router.get('/cohort-analysis', async (req: Request, res: Response) => {
+    try {
+        const cohorts: any[] = await query(`
+            SELECT
+                TO_CHAR(c.created_at, 'YYYY-MM') as cohort_month,
+                COUNT(DISTINCT c.id) as cohort_size,
+                COUNT(DISTINCT p.id) as total_purchases,
+                COALESCE(SUM(p.total_amount), 0) as total_revenue,
+                COALESCE(AVG(p.total_amount), 0) as avg_order_value,
+                COUNT(DISTINCT CASE WHEN p.purchase_date >= CURRENT_DATE - INTERVAL '30 days' THEN c.id END) as active_last_30d
+            FROM customers c
+            LEFT JOIN purchases p ON c.id = p.customer_id
+            WHERE c.created_at IS NOT NULL
+            GROUP BY TO_CHAR(c.created_at, 'YYYY-MM')
+            ORDER BY cohort_month DESC
+            LIMIT 12
+        `) as any[];
+
+        const withRetention = cohorts.map((c: any) => ({
+            cohort_month: c.cohort_month,
+            cohort_size: Number(c.cohort_size),
+            total_purchases: Number(c.total_purchases),
+            total_revenue: Number(c.total_revenue),
+            avg_order_value: Math.round(Number(c.avg_order_value)),
+            active_last_30d: Number(c.active_last_30d),
+            retention_rate: c.cohort_size > 0 ? Math.round((Number(c.active_last_30d) / Number(c.cohort_size)) * 100) : 0,
+            revenue_per_customer: c.cohort_size > 0 ? Math.round(Number(c.total_revenue) / Number(c.cohort_size)) : 0,
+        }));
+
+        res.json({ cohorts: withRetention.reverse(), total_cohorts: withRetention.length });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 export default router;

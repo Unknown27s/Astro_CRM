@@ -9,22 +9,37 @@ import {
   assessCustomerRisk,
   generateSalesForecast,
   generateReportSummary,
-  generateChatResponse,
+  generateSmartChatResponse,
+  generateAutocomplete,
 } from './aihelper';
 
 const router = Router();
 
-// ─── POST /api/ai/chat ────────────────────────────────────────────────────────
+// ─── POST /api/ai/chat (DB-aware) ─────────────────────────────────────────────
 router.post('/chat', async (req: Request, res: Response) => {
   try {
     const { messages } = req.body;
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'Valid messages array is required' });
     }
-    const reply = await generateChatResponse(messages);
+    const reply = await generateSmartChatResponse(messages);
     res.json({ reply });
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Chat failed' });
+  }
+});
+
+// ─── POST /api/ai/autocomplete ────────────────────────────────────────────────
+router.post('/autocomplete', async (req: Request, res: Response) => {
+  try {
+    const { context, partialText, entityType } = req.body;
+    if (!context) {
+      return res.status(400).json({ error: 'Context is required' });
+    }
+    const suggestion = await generateAutocomplete({ context, partialText: partialText || '', entityType });
+    res.json({ suggestion });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Autocomplete failed' });
   }
 });
 

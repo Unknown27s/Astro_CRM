@@ -101,6 +101,12 @@ export const analytics = {
     segmentCustomers: (numClusters: number) =>
         api.post('/analytics/segment-customers', { numClusters }),
     getSalesTrends: (params?: any) => api.get('/analytics/trends/sales', { params }),
+    getRfmAnalysis: () => api.get('/analytics/rfm-analysis'),
+    getChurnRisk: () => api.get('/analytics/churn-risk'),
+    getCustomerLtv: () => api.get('/analytics/customer-ltv'),
+    getProductAffinity: () => api.get('/analytics/product-affinity'),
+    getRevenueForecasting: () => api.get('/analytics/revenue-forecast'),
+    getCohortAnalysis: () => api.get('/analytics/cohort-analysis'),
 };
 
 // Reports
@@ -169,6 +175,8 @@ export const aiService = {
         api.post('/ai/sales-forecast'),
     reportSummary: (data?: { month?: number; year?: number }) =>
         api.post('/ai/report-summary', data || {}),
+    autocomplete: (data: { context: string; partialText: string; entityType?: string }) =>
+        api.post('/ai/autocomplete', data),
 };
 
 // Activities (CRM interaction tracking)

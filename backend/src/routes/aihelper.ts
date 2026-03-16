@@ -2,7 +2,7 @@
 
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
-import { queryOne } from '../database/db';
+import { query, queryOne } from '../database/db';
 dotenv.config();
 
 const MODEL = 'asi1';
@@ -97,7 +97,109 @@ async function callAI(
   return 'No response generated.';
 }
 
-// ─── Chat: General CRM assistant ────────────────────────────────────────────
+// ─── CRM Query Templates ─────────────────────────────────────────────────────
+
+interface CrmQueryTemplate {
+  keywords: string[];
+  label: string;
+  sql: string;
+}
+
+const CRM_QUERY_TEMPLATES: CrmQueryTemplate[] = [
+  {
+    keywords: ['top customer', 'best customer', 'highest spend', 'most spending'],
+    label: 'Top Customers by Spending',
+    sql: `SELECT name, phone, total_spent, total_purchases, status FROM customers ORDER BY total_spent DESC LIMIT 10`,
+  },
+  {
+    keywords: ['total revenue', 'total sale', 'how much revenue', 'total earning'],
+    label: 'Total Revenue',
+    sql: `SELECT COALESCE(SUM(total_spent),0) as total_revenue, COUNT(*) as total_customers FROM customers`,
+  },
+  {
+    keywords: ['open deal', 'active deal', 'pipeline', 'deal in progress'],
+    label: 'Open Deals in Pipeline',
+    sql: `SELECT d.title, d.value, d.stage, c.name as customer_name FROM deals d LEFT JOIN customers c ON d.customer_id = c.id WHERE d.stage NOT IN ('Closed Won','Closed Lost') ORDER BY d.value DESC LIMIT 15`,
+  },
+  {
+    keywords: ['won deal', 'closed won', 'deal won'],
+    label: 'Won Deals',
+    sql: `SELECT d.title, d.value, c.name as customer_name, d.won_date FROM deals d LEFT JOIN customers c ON d.customer_id = c.id WHERE d.stage = 'Closed Won' ORDER BY d.won_date DESC LIMIT 10`,
+  },
+  {
+    keywords: ['lost deal', 'closed lost', 'deal lost'],
+    label: 'Lost Deals',
+    sql: `SELECT d.title, d.value, c.name as customer_name, d.lost_reason FROM deals d LEFT JOIN customers c ON d.customer_id = c.id WHERE d.stage = 'Closed Lost' ORDER BY d.lost_date DESC LIMIT 10`,
+  },
+  {
+    keywords: ['how many customer', 'total customer', 'customer count'],
+    label: 'Customer Statistics',
+    sql: `SELECT COUNT(*) as total, COUNT(CASE WHEN status='Active' THEN 1 END) as active, COUNT(CASE WHEN status='VIP' THEN 1 END) as vip, COUNT(CASE WHEN status='Inactive' THEN 1 END) as inactive FROM customers`,
+  },
+  {
+    keywords: ['recent purchase', 'latest purchase', 'last purchase'],
+    label: 'Recent Purchases',
+    sql: `SELECT p.total_amount, p.purchase_date, p.payment_method, c.name as customer_name FROM purchases p LEFT JOIN customers c ON p.customer_id = c.id ORDER BY p.purchase_date DESC LIMIT 10`,
+  },
+  {
+    keywords: ['revenue this month', 'this month sale', 'monthly revenue', 'current month'],
+    label: 'This Month Revenue',
+    sql: `SELECT COALESCE(SUM(total_amount),0) as revenue, COUNT(*) as orders FROM purchases WHERE EXTRACT(MONTH FROM purchase_date) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM purchase_date) = EXTRACT(YEAR FROM CURRENT_DATE)`,
+  },
+  {
+    keywords: ['inactive customer', 'dormant customer', 'not buying'],
+    label: 'Inactive Customers',
+    sql: `SELECT name, phone, total_spent, last_purchase_date FROM customers WHERE status = 'Inactive' ORDER BY total_spent DESC LIMIT 10`,
+  },
+  {
+    keywords: ['vip customer', 'premium customer', 'high value'],
+    label: 'VIP Customers',
+    sql: `SELECT name, phone, total_spent, total_purchases FROM customers WHERE status = 'VIP' ORDER BY total_spent DESC LIMIT 10`,
+  },
+  {
+    keywords: ['overdue task', 'overdue activit', 'pending task', 'missed follow'],
+    label: 'Overdue Activities',
+    sql: `SELECT a.subject, a.type, a.priority, a.due_date, c.name as customer_name FROM activities a LEFT JOIN customers c ON a.customer_id = c.id WHERE a.completed = false AND a.due_date < CURRENT_TIMESTAMP ORDER BY a.due_date ASC LIMIT 10`,
+  },
+  {
+    keywords: ['upcoming task', 'upcoming activit', 'today task', 'due soon'],
+    label: 'Upcoming Activities',
+    sql: `SELECT a.subject, a.type, a.priority, a.due_date, c.name as customer_name FROM activities a LEFT JOIN customers c ON a.customer_id = c.id WHERE a.completed = false AND a.due_date >= CURRENT_TIMESTAMP AND a.due_date <= CURRENT_TIMESTAMP + INTERVAL '7 days' ORDER BY a.due_date ASC LIMIT 10`,
+  },
+  {
+    keywords: ['deal summary', 'pipeline summary', 'deal stat', 'deal overview'],
+    label: 'Deals Summary',
+    sql: `SELECT stage, COUNT(*) as count, COALESCE(SUM(value),0) as total_value FROM deals GROUP BY stage ORDER BY total_value DESC`,
+  },
+  {
+    keywords: ['top product', 'best selling', 'popular product', 'most sold'],
+    label: 'Top Products',
+    sql: `SELECT name, price, stock_qty, COALESCE(total_sold,0) as total_sold FROM products WHERE is_visible = true ORDER BY total_sold DESC LIMIT 10`,
+  },
+  {
+    keywords: ['campaign', 'marketing', 'sms campaign', 'email campaign'],
+    label: 'Campaigns Overview',
+    sql: `SELECT name, campaign_type, status, sent_count, target_audience, created_at FROM campaigns ORDER BY created_at DESC LIMIT 10`,
+  },
+];
+
+async function detectAndRunCrmQuery(userMessage: string): Promise<{ label: string; data: any[] } | null> {
+  const msg = userMessage.toLowerCase();
+  for (const tpl of CRM_QUERY_TEMPLATES) {
+    if (tpl.keywords.some(kw => msg.includes(kw))) {
+      try {
+        const data = await query(tpl.sql);
+        return { label: tpl.label, data: data as any[] };
+      } catch (err: any) {
+        console.error(`[AI Query] Error running template '${tpl.label}':`, err.message);
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+// ─── Chat: General CRM assistant (DB-aware) ─────────────────────────────────
 
 export async function generateChatResponse(
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>
@@ -112,6 +214,57 @@ export async function generateChatResponse(
   };
 
   return callAI([system, ...messages]);
+}
+
+export async function generateSmartChatResponse(
+  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>
+): Promise<string> {
+  // Get the last user message
+  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+  let dbContext = '';
+
+  if (lastUserMsg) {
+    const result = await detectAndRunCrmQuery(lastUserMsg.content);
+    if (result && result.data.length > 0) {
+      dbContext = `\n\n[LIVE CRM DATA — ${result.label}]\n${JSON.stringify(result.data, null, 2)}\n[END DATA]\n\nUse this real data to answer the user's question accurately. Cite specific numbers and names from the data. Format currency as ₹.`;
+    }
+  }
+
+  const system = {
+    role: 'system' as const,
+    content:
+      'You are Astro AI, the intelligent assistant for AstroCRM — a retail/eCommerce CRM platform. ' +
+      'You have direct access to the business database and can provide real, live data. ' +
+      'Give actionable, concise, and data-driven answers. Use exact numbers from the data. ' +
+      'Format responses with markdown bold for key values. Be friendly and professional.' +
+      dbContext,
+  };
+
+  return callAI([system, ...messages]);
+}
+
+// ─── AI Autocomplete for descriptions ────────────────────────────────────────
+
+export async function generateAutocomplete(data: {
+  context: string;
+  partialText: string;
+  entityType?: string;
+}): Promise<string> {
+  const prompt = `You are an AI writing assistant for a CRM application. Complete or improve the following text based on its context.
+
+Context: ${data.context}
+Entity type: ${data.entityType || 'general'}
+Partial text: "${data.partialText}"
+
+Rules:
+- If the text is empty, write a professional 1-2 sentence suggestion
+- If the text has content, complete or expand it naturally
+- Keep it concise and professional
+- Use business/CRM appropriate language
+- Return ONLY the completed text, nothing else
+- Do NOT add quotes around the response`;
+
+  return callAI([{ role: 'user', content: prompt }]);
 }
 
 // ─── Dashboard Summary ────────────────────────────────────────────────────────

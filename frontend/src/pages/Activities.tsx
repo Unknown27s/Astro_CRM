@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { activities, customers } from '../services/api';
+import { activities, customers, aiService } from '../services/api';
 import toast from 'react-hot-toast';
 import {
     Phone,
@@ -587,10 +587,30 @@ function ActivityForm({
 
             {/* Description */}
             <div>
-                <Label htmlFor="activity-desc">Description</Label>
+                <div className="flex items-center justify-between mb-1">
+                    <Label htmlFor="activity-desc">Description</Label>
+                    <button
+                        type="button"
+                        onClick={async () => {
+                            if (!formData.subject) { toast.error('Enter a subject first'); return; }
+                            try {
+                                const res = await aiService.autocomplete({
+                                    context: `Activity: ${formData.type} - ${formData.subject}`,
+                                    partialText: formData.description || '',
+                                    entityType: 'activity',
+                                });
+                                setFormData({ ...formData, description: res.data.suggestion || formData.description });
+                                toast.success('AI suggestion applied');
+                            } catch { toast.error('AI suggestion failed'); }
+                        }}
+                        className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-full transition-colors"
+                    >
+                        ✨ AI Suggest
+                    </button>
+                </div>
                 <textarea
                     id="activity-desc"
-                    placeholder="Add notes or details..."
+                    placeholder="Add notes or details... (or click AI Suggest)"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
